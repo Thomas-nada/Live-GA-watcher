@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Cardano Governance Proposals</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for a more integrated look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; /* bg-gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; /* bg-gray-600 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* bg-gray-500 */
+        }
+        /* Style for the select dropdown arrow */
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%239CA3AF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.4-5.4-12.8z%22%2F%3E%3C%2Fsvg%3E');
+            background-repeat: no-repeat;
+            background-position: right 0.7rem center;
+            background-size: 0.65rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 antialiased">
+
+    <!-- Main Container -->
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- Header Section -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-white mb-2">Active Cardano Governance Proposals</h1>
+            <p class="text-gray-400">Live data sorted by DRep "Yes" vote percentage.</p>
+        </header>
+
+        <!-- Filter and Sort Controls -->
+        <div id="controls" class="mb-8 flex flex-col sm:flex-row gap-4">
+            <input type="text" id="search-filter" placeholder="Filter by title..." class="flex-grow bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+            <select id="sort-select" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                <option value="yes-pct-desc">Sort by: Highest Yes %</option>
+                <option value="yes-pct-asc">Sort by: Lowest Yes %</option>
+                <option value="votes-cast-desc">Sort by: Most "Yes" Votes</option>
+                <option value="votes-cast-asc">Sort by: Fewest "Yes" Votes</option>
+            </select>
+        </div>
+
+        <!-- Main Content: Loading State and Results Grid -->
+        <main id="proposals-container">
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="flex flex-col items-center justify-center text-center p-10">
+                <svg class="animate-spin h-8 w-8 text-white mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p class="text-lg font-medium">Fetching live proposal data from Koios...</p>
+                <p class="text-gray-500">This may take a moment.</p>
+            </div>
+            <!-- Error Message Placeholder -->
+            <div id="error-message" class="hidden bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg relative" role="alert">
+                <strong class="font-bold">Error:</strong>
+                <span class="block sm:inline" id="error-text"></span>
+            </div>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="text-center mt-12 text-gray-500 text-sm space-y-2">
+            <p>Data sourced from the <a href="https://koios.rest/" target="_blank" class="text-blue-400 hover:underline">Koios REST API</a> via a CORS proxy.</p>
+            <p>
+                Based on this 
+                <a href="https://github.com/IntersectMBO/governance-scripts/blob/main/scripts/query-live-actions.sh" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">script</a>
+                by 
+                <a href="https://github.com/IntersectMBO/governance-scripts/commits?author=Ryun1" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">Ryun1</a>.
+            </p>
+            <p>Last updated: <span id="last-updated"></span></p>
+        </footer>
+
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const apiBase = "https://api.koios.rest/api/v1";
+            const proposalsContainer = document.getElementById('proposals-container');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const errorMessageContainer = document.getElementById('error-message');
+            const errorTextElement = document.getElementById('error-text');
+            const lastUpdatedElement = document.getElementById('last-updated');
+            const searchInput = document.getElementById('search-filter');
+            const sortSelect = document.getElementById('sort-select');
+            
+            let allFetchedProposals = []; // To store the master list of proposals
+
+            /**
+             * Displays an error message in the UI.
+             * @param {string} message - The error message to display.
+             */
+            function displayError(message) {
+                loadingIndicator.classList.add('hidden');
+                errorTextElement.textContent = message;
+                errorMessageContainer.classList.remove('hidden');
+            }
+            
+            /**
+             * Renders proposal cards into the DOM.
+             * @param {Array<Object>} proposalsToRender - The array of proposal objects to render.
+             */
+            function renderProposals(proposalsToRender) {
+                // Clear previous results
+                proposalsContainer.innerHTML = '';
+                
+                if (proposalsToRender.length === 0) {
+                    proposalsContainer.innerHTML = `<div class="text-center p-10 bg-gray-800 rounded-lg col-span-full"><p class="text-lg">No proposals match the current criteria.</p></div>`;
+                    return;
+                }
+
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+
+                proposalsToRender.forEach(proposal => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-gray-800 rounded-xl shadow-lg p-6 flex flex-col transition-transform transform hover:scale-105 hover:shadow-cyan-500/10';
+
+                    const yesPct = parseFloat(proposal.drep_yes_pct).toFixed(2);
+                    const yesVotes = proposal.drep_yes_votes_cast.toLocaleString();
+                    const abstainVotes = proposal.drep_abstain_votes_cast.toLocaleString();
+
+                    card.innerHTML = `
+                        <div class="flex-grow">
+                            <h2 class="text-lg font-bold text-white mb-1">${proposal.title}</h2>
+                            <a href="https://gov.tools/governance_actions/${proposal.proposal_id}" target="_blank" rel="noopener noreferrer" class="block text-xs text-cyan-400 hover:underline mb-4 break-all font-mono">
+                                ID: ${proposal.proposal_id}
+                            </a>
+                            
+                            <div class="mb-4">
+                                <div class="flex justify-between items-end mb-1">
+                                    <span class="text-sm font-medium text-green-400">DRep "Yes" Votes</span>
+                                    <span class="text-xl font-bold text-green-300">${yesPct}%</span>
+                                </div>
+                                <div class="relative w-full bg-gray-700 rounded-full h-3">
+                                    <div class="bg-gradient-to-r from-green-500 to-emerald-400 h-3 rounded-full" style="width: ${yesPct}%"></div>
+                                    <div class="absolute top-[-2px] bottom-[-2px] left-[67%] w-0.5 bg-yellow-300 transform -translate-x-1/2" title="67% Approval Threshold"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-auto pt-4 border-t border-gray-700/50 flex justify-around text-center">
+                            <div>
+                                <p class="text-sm text-gray-400">"Yes" Votes Cast</p>
+                                <p class="text-lg font-semibold text-white">${yesVotes}</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-400">"Abstain" Votes Cast</p>
+                                <p class="text-lg font-semibold text-white">${abstainVotes}</p>
+                            </div>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+                proposalsContainer.appendChild(grid);
+            }
+
+            /**
+             * Filters and sorts the master list of proposals, then calls the render function.
+             */
+            function applyFiltersAndSorting() {
+                const filterText = searchInput.value.toLowerCase();
+                const sortValue = sortSelect.value;
+                
+                // 1. Apply filter
+                let filteredProposals = allFetchedProposals.filter(p => 
+                    p.title.toLowerCase().includes(filterText)
+                );
+
+                // 2. Apply sorting
+                filteredProposals.sort((a, b) => {
+                    switch (sortValue) {
+                        case 'yes-pct-asc':
+                            return a.drep_yes_pct - b.drep_yes_pct;
+                        case 'votes-cast-desc':
+                            return b.drep_yes_votes_cast - a.drep_yes_votes_cast;
+                        case 'votes-cast-asc':
+                            return a.drep_yes_votes_cast - b.drep_yes_votes_cast;
+                        case 'yes-pct-desc':
+                        default:
+                            return b.drep_yes_pct - a.drep_yes_pct;
+                    }
+                });
+                
+                renderProposals(filteredProposals);
+            }
+            
+            // Add event listeners for the controls
+            searchInput.addEventListener('input', applyFiltersAndSorting);
+            sortSelect.addEventListener('change', applyFiltersAndSorting);
+
+            /**
+             * Main function to fetch, process, and display proposal data.
+             */
+            async function fetchAndDisplayProposals() {
+                const proxyUrl = (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
+                try {
+                    const proposalListEndpoint = `${apiBase}/proposal_list`;
+                    const proposalListResponse = await fetch(proxyUrl(proposalListEndpoint));
+                    if (!proposalListResponse.ok) throw new Error(`Failed to fetch proposal list via proxy. Status: ${proposalListResponse.status}`);
+                    const allProposals = await proposalListResponse.json();
+
+                    const activeProposals = allProposals.filter(p => p.ratified_epoch === null && p.enacted_epoch === null && p.dropped_epoch === null && p.expired_epoch === null);
+
+                    const proposalPromises = activeProposals.map(async (proposal) => {
+                        try {
+                            const summaryEndpoint = `${apiBase}/proposal_voting_summary?_proposal_id=${proposal.proposal_id}`;
+                            const summaryResponse = await fetch(proxyUrl(summaryEndpoint));
+                            if (!summaryResponse.ok) return null;
+                            const summary = await summaryResponse.json();
+                            if (summary && summary.length > 0) {
+                                return {
+                                    proposal_id: proposal.proposal_id,
+                                    title: proposal.meta_json?.body?.title || 'No Title Found',
+                                    summaryData: summary[0]
+                                };
+                            }
+                            return null;
+                        } catch (err) { return null; }
+                    });
+
+                    const detailedProposals = (await Promise.all(proposalPromises)).filter(p => p !== null);
+
+                    allFetchedProposals = detailedProposals.map(p => ({
+                        proposal_id: p.proposal_id,
+                        title: p.title,
+                        drep_yes_pct: parseFloat(p.summaryData.drep_yes_pct || 0),
+                        drep_yes_votes_cast: parseInt(p.summaryData.drep_yes_votes_cast || 0, 10),
+                        drep_abstain_votes_cast: parseInt(p.summaryData.drep_abstain_votes_cast || 0, 10)
+                    }));
+                    
+                    loadingIndicator.remove(); // Remove loading indicator once data is processed
+                    applyFiltersAndSorting(); // Initial render with default sorting
+
+                } catch (error) {
+                    console.error("An error occurred:", error);
+                    displayError(error.message || "Could not connect to the API. This may be an issue with the CORS proxy.");
+                } finally {
+                    lastUpdatedElement.textContent = new Date().toLocaleString();
+                }
+            }
+
+            // Initial call to start the process
+            fetchAndDisplayProposals();
+        });
+    </script>
+
+</body>
+</html>
