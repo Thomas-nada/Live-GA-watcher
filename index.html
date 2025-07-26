@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Active Cardano Governance Proposals</title>
+    <title>Active Cardano Governance Proposals (Multi-Network)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -36,6 +37,43 @@
             background-position: right 0.7rem center;
             background-size: 0.65rem;
         }
+        .modal-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .modal-scrollbar::-webkit-scrollbar-track {
+            background: #374151; /* bg-gray-700 */
+        }
+        .modal-scrollbar::-webkit-scrollbar-thumb {
+            background: #6b7280; /* bg-gray-500 */
+            border-radius: 3px;
+        }
+        .threshold-line {
+            position: absolute;
+            top: -2px;
+            bottom: -2px;
+            width: 2px;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+        select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .rationale-content {
+            background-color: #1f2937; /* bg-gray-800 */
+            border-left: 3px solid #0891b2; /* border-cyan-600 */
+        }
+        .rationale-content h1, .rationale-content h2, .rationale-content h3 {
+            font-weight: bold;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .rationale-content h1 { font-size: 1.25rem; }
+        .rationale-content h2 { font-size: 1.1rem; }
+        .rationale-content ul { list-style-type: disc; margin-left: 1.5rem; }
+        .rationale-content ol { list-style-type: decimal; margin-left: 1.5rem; }
+        .rationale-content a { color: #67e8f9; text-decoration: underline; }
+        .rationale-content p { margin-bottom: 0.5rem; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 antialiased">
@@ -46,127 +84,226 @@
         <!-- Header Section -->
         <header class="text-center mb-8">
             <h1 class="text-3xl sm:text-4xl font-bold text-white mb-2">Active Cardano Governance Proposals</h1>
-            <p class="text-gray-400">Live data sorted by DRep "Yes" vote percentage.</p>
+            <p class="text-gray-400">Live DRep and SPO voting data for <span id="network-name" class="font-bold text-cyan-400">Mainnet</span></p>
         </header>
 
         <!-- Filter and Sort Controls -->
-        <div id="controls" class="mb-8 flex flex-col sm:flex-row gap-4">
-            <input type="text" id="search-filter" placeholder="Filter by title..." class="flex-grow bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+        <div id="controls" class="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <select id="network-select" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                <option value="mainnet">Network: Mainnet</option>
+                <option value="preprod">Network: Preprod</option>
+                <option value="preview">Network: Preview</option>
+            </select>
+            <select id="type-filter" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                <option value="all">Filter by Type: All</option>
+                <option value="ParameterChange">Parameter Change</option>
+                <option value="HardForkInitiation">Hard-Fork Initiation</option>
+                <option value="TreasuryWithdrawals">Treasury Withdrawals</option>
+                <option value="MotionOfNoConfidence">Motion of No-Confidence</option>
+                <option value="NewCommittee">New Committee</option>
+                <option value="UpdateToConstitution">Update Constitution</option>
+                <option value="InfoAction">Info Action</option>
+            </select>
+            <input type="text" id="search-filter" placeholder="Filter by title..." class="sm:col-span-2 lg:col-span-1 flex-grow bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
             <select id="sort-select" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
-                <option value="yes-pct-desc">Sort by: Highest Yes %</option>
-                <option value="yes-pct-asc">Sort by: Lowest Yes %</option>
-                <option value="votes-cast-desc">Sort by: Most "Yes" Votes</option>
-                <option value="votes-cast-asc">Sort by: Fewest "Yes" Votes</option>
+                <option value="drep-yes-pct-desc">Sort by: Highest DRep Yes %</option>
+                <option value="drep-yes-pct-asc">Sort by: Lowest DRep Yes %</option>
+                <option value="spo-yes-pct-desc">Sort by: Highest SPO Yes %</option>
+                <option value="spo-yes-pct-asc">Sort by: Lowest SPO Yes %</option>
             </select>
         </div>
 
         <!-- Main Content: Loading State and Results Grid -->
         <main id="proposals-container">
-            <!-- Loading Indicator -->
-            <div id="loading-indicator" class="flex flex-col items-center justify-center text-center p-10">
-                <svg class="animate-spin h-8 w-8 text-white mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <p class="text-lg font-medium">Fetching live proposal data from Koios...</p>
-                <p class="text-gray-500">This may take a moment.</p>
-            </div>
-            <!-- Error Message Placeholder -->
-            <div id="error-message" class="hidden bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg relative" role="alert">
-                <strong class="font-bold">Error:</strong>
-                <span class="block sm:inline" id="error-text"></span>
-            </div>
+            <!-- Loading Indicator will be injected here -->
         </main>
         
         <!-- Footer -->
         <footer class="text-center mt-12 text-gray-500 text-sm space-y-2">
-            <p>Data sourced from the <a href="https://koios.rest/" target="_blank" class="text-blue-400 hover:underline">Koios REST API</a> via a CORS proxy.</p>
-            <p>
-                Based on this 
-                <a href="https://github.com/IntersectMBO/governance-scripts/blob/main/scripts/query-live-actions.sh" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">script</a>
-                by 
-                <a href="https://github.com/IntersectMBO/governance-scripts/commits?author=Ryun1" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">Ryun1</a>.
-            </p>
+            <p>Data sourced from the <a href="https://koios.rest/" target="_blank" class="text-blue-400 hover:underline">Koios REST API</a>.</p>
+             <p>UI inspired by a <a href="https://github.com/IntersectMBO/governance-scripts/blob/main/scripts/query-live-actions.sh" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">script</a> by <a href="https://github.com/Ryun1" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">Ryun1</a>.</p>
             <p>Last updated: <span id="last-updated"></span></p>
         </footer>
 
     </div>
 
+    <!-- Votes Modal -->
+    <div id="votes-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+            <div class="p-4 border-b border-gray-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 id="modal-title" class="text-xl font-bold text-white">Votes</h3>
+                    <button id="modal-close-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <input type="checkbox" id="rationale-filter" class="bg-gray-700 border-gray-600 rounded focus:ring-cyan-500 h-4 w-4 text-cyan-600">
+                    <label for="rationale-filter" class="text-sm text-gray-300">Show only votes with rationale</label>
+                </div>
+            </div>
+            <div id="modal-content" class="p-6 overflow-y-auto modal-scrollbar">
+                <!-- Votes will be loaded here -->
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript Logic -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const apiBase = "https://api.koios.rest/api/v1";
+            // --- DOM Elements ---
             const proposalsContainer = document.getElementById('proposals-container');
-            const loadingIndicator = document.getElementById('loading-indicator');
-            const errorMessageContainer = document.getElementById('error-message');
-            const errorTextElement = document.getElementById('error-text');
             const lastUpdatedElement = document.getElementById('last-updated');
             const searchInput = document.getElementById('search-filter');
             const sortSelect = document.getElementById('sort-select');
-            
-            let allFetchedProposals = []; // To store the master list of proposals
+            const networkSelect = document.getElementById('network-select');
+            const typeFilterSelect = document.getElementById('type-filter');
+            const networkNameSpan = document.getElementById('network-name');
+            const modal = document.getElementById('votes-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalContent = document.getElementById('modal-content');
+            const modalCloseBtn = document.getElementById('modal-close-btn');
+            const rationaleFilterCheckbox = document.getElementById('rationale-filter');
 
-            /**
-             * Displays an error message in the UI.
-             * @param {string} message - The error message to display.
-             */
-            function displayError(message) {
-                loadingIndicator.classList.add('hidden');
-                errorTextElement.textContent = message;
-                errorMessageContainer.classList.remove('hidden');
-            }
+            // --- State and Configuration ---
+            let allFetchedProposals = [];
+            let currentNetwork = 'mainnet';
+            let currentModalVotes = [];
+            let currentModalVoterType = '';
+            const markdownConverter = new showdown.Converter();
+
+            const networkConfigs = {
+                mainnet: { apiBase: "https://api.koios.rest/api/v1", govTools: "https://gov.tools", cExplorer: "https://cexplorer.io", name: "Mainnet" },
+                preprod: { apiBase: "https://preprod.koios.rest/api/v1", govTools: "https://preprod.gov.tools", cExplorer: "https://preprod.cexplorer.io", name: "Pre-production" },
+                preview: { apiBase: "https://preview.koios.rest/api/v1", govTools: "https://preview.gov.tools", cExplorer: "https://preview.cexplorer.io", name: "Preview" }
+            };
+
+            const typeStyles = {
+                'MotionOfNoConfidence': { text: 'Motion of No-Confidence', classes: 'bg-red-800 text-red-100 border-red-600' },
+                'NewCommittee': { text: 'New Committee', classes: 'bg-blue-800 text-blue-100 border-blue-600' },
+                'UpdateToConstitution': { text: 'Update Constitution', classes: 'bg-indigo-800 text-indigo-100 border-indigo-600' },
+                'HardForkInitiation': { text: 'Hard Fork', classes: 'bg-amber-800 text-amber-100 border-amber-600' },
+                'TreasuryWithdrawals': { text: 'Treasury Withdrawal', classes: 'bg-green-800 text-green-100 border-green-600' },
+                'ParameterChange': { text: 'Param Change', classes: 'bg-teal-800 text-teal-100 border-teal-600'},
+                'InfoAction': { text: 'Info Action', classes: 'bg-gray-700 text-gray-200 border-gray-500' },
+                'Default': { text: 'Unknown Type', classes: 'bg-gray-700 text-gray-200 border-gray-500' }
+            };
             
-            /**
-             * Renders proposal cards into the DOM.
-             * @param {Array<Object>} proposalsToRender - The array of proposal objects to render.
-             */
+            const jokes = ["Waking up the Koios API...", "Consulting the Ouroboros...", "Syncing with the epoch boundary...", "Delegating our fetch request..."];
+
+            // --- Date Calculation ---
+            const ANCHOR_EPOCH = 577;
+            const ANCHOR_EPOCH_END_MS = new Date('2025-08-17T21:45:00Z').getTime();
+            const EPOCH_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
+
+            function getExpirationTimestamp(expirationEpoch) {
+                if (!expirationEpoch) return null;
+                const epochDiff = expirationEpoch - ANCHOR_EPOCH;
+                return ANCHOR_EPOCH_END_MS + (epochDiff * EPOCH_DURATION_MS);
+            }
+
+            // --- Helper Functions ---
+            function pascalToTitleCase(s) {
+                if (!s) return '';
+                return s.replace(/([A-Z])/g, ' $1').trim();
+            }
+
+            // --- Threshold Logic ---
+            function getThresholds(proposalType) {
+                switch (proposalType) {
+                    case 'TreasuryWithdrawals': return { drep: 0.67, spo: null };
+                    case 'HardForkInitiation': return { drep: 0.60, spo: 0.51 };
+                    case 'MotionOfNoConfidence': return { drep: 0.67, spo: 0.51 };
+                    case 'NewCommittee': return { drep: 0.67, spo: 0.51 };
+                    case 'UpdateToConstitution': return { drep: 0.75, spo: null };
+                    case 'ParameterChange': return { drep: 0.67, spo: 0.51 };
+                    case 'InfoAction': return { drep: null, spo: null };
+                    default: return { drep: null, spo: null };
+                }
+            }
+
+            // --- UI Functions ---
+            function showLoading() {
+                const joke = jokes[Math.floor(Math.random() * jokes.length)];
+                proposalsContainer.innerHTML = `<div id="loading-indicator" class="flex flex-col items-center justify-center text-center p-10"><svg class="animate-spin h-8 w-8 text-white mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p class="text-lg font-medium">${joke}</p><p class="text-gray-500">Fetching data for ${networkConfigs[currentNetwork].name}.</p></div>`;
+                setControlsDisabled(true);
+            }
+
+            function displayError(message) {
+                proposalsContainer.innerHTML = `<div id="error-message" class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg relative" role="alert"><strong class="font-bold">Error:</strong> <span class="block sm:inline">${message}</span></div>`;
+                setControlsDisabled(false);
+            }
+
+            function setControlsDisabled(disabled) {
+                [networkSelect, searchInput, sortSelect, typeFilterSelect].forEach(el => el.disabled = disabled);
+            }
+
             function renderProposals(proposalsToRender) {
-                // Clear previous results
                 proposalsContainer.innerHTML = '';
+                setControlsDisabled(false);
                 
                 if (proposalsToRender.length === 0) {
-                    proposalsContainer.innerHTML = `<div class="text-center p-10 bg-gray-800 rounded-lg col-span-full"><p class="text-lg">No proposals match the current criteria.</p></div>`;
+                    proposalsContainer.innerHTML = `<div class="text-center p-10 bg-gray-800 rounded-lg col-span-full"><p class="text-lg">No proposals match the current filters on ${networkConfigs[currentNetwork].name}.</p></div>`;
                     return;
                 }
 
                 const grid = document.createElement('div');
                 grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+                const config = networkConfigs[currentNetwork];
 
                 proposalsToRender.forEach(proposal => {
                     const card = document.createElement('div');
-                    card.className = 'bg-gray-800 rounded-xl shadow-lg p-6 flex flex-col transition-transform transform hover:scale-105 hover:shadow-cyan-500/10';
+                    card.className = 'bg-gray-800 rounded-xl shadow-lg p-6 flex flex-col transition-all duration-300 hover:shadow-cyan-500/20 hover:ring-1 hover:ring-cyan-800';
+                    
+                    const style = typeStyles[proposal.type] || { ...typeStyles['Default'], text: pascalToTitleCase(proposal.type) };
+                    const typeBadge = `<div class="mb-4"><span class="text-xs font-bold px-3 py-1 rounded-full border ${style.classes}">${style.text.toUpperCase()}</span></div>`;
 
-                    const yesPct = parseFloat(proposal.drep_yes_pct).toFixed(2);
-                    const yesVotes = proposal.drep_yes_votes_cast.toLocaleString();
-                    const abstainVotes = proposal.drep_abstain_votes_cast.toLocaleString();
+                    const expirationDate = new Date(proposal.expiration_timestamp);
+                    const expirationHTML = `
+                        <div class="mt-4 pt-4 border-t border-gray-600/50 flex flex-col gap-1 text-sm text-gray-400">
+                            <div class="flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock flex-shrink-0" viewBox="0 0 16 16">
+                                    <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
+                                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
+                                </svg>
+                                <span>Expires in Epoch: <strong>${proposal.expiration_epoch}</strong></span>
+                            </div>
+                            <div class="text-xs text-gray-500 pl-6">
+                                (${expirationDate.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })})
+                            </div>
+                        </div>`;
+
+                    const drepYesPct = parseFloat(proposal.drep_yes_pct).toFixed(2);
+                    const spoYesPct = parseFloat(proposal.spo_yes_pct).toFixed(2);
+                    const hasSpoVotes = proposal.spo_yes_votes_cast + proposal.spo_no_votes_cast + proposal.spo_abstain_votes_cast > 0;
+                    
+                    const thresholds = getThresholds(proposal.type);
+
+                    let drepThresholdHTML = thresholds.drep !== null ? `<div class="threshold-line bg-yellow-300" style="left: ${thresholds.drep * 100}%;" title="Threshold: ${thresholds.drep * 100}%"></div>` : '';
+                    let spoThresholdHTML = thresholds.spo !== null ? `<div class="threshold-line bg-yellow-300" style="left: ${thresholds.spo * 100}%;" title="Threshold: ${thresholds.spo * 100}%"></div>` : '';
+
+                    let spoSectionHTML = hasSpoVotes ? `<div class="mt-4 pt-4 border-t border-gray-700/50"><div class="mb-4"><div class="flex justify-between items-end mb-1"><span class="text-sm font-medium text-purple-400">SPO "Yes" Votes</span><span class="text-xl font-bold text-purple-300">${spoYesPct}%</span></div><div class="relative w-full bg-gray-700 rounded-full h-3"><div class="bg-gradient-to-r from-purple-500 to-fuchsia-500 h-3 rounded-full" style="width: ${spoYesPct}%"></div>${spoThresholdHTML}</div></div><div class="grid grid-cols-3 gap-2 text-center text-sm mt-3"><div><p class="text-gray-400">Yes</p><p class="font-semibold">${proposal.spo_yes_votes_cast.toLocaleString()}</p></div><div><p class="text-gray-400">No</p><p class="font-semibold">${proposal.spo_no_votes_cast.toLocaleString()}</p></div><div><p class="text-gray-400">Abstain</p><p class="font-semibold">${proposal.spo_abstain_votes_cast.toLocaleString()}</p></div></div></div>` : '';
 
                     card.innerHTML = `
                         <div class="flex-grow">
+                            ${typeBadge}
                             <h2 class="text-lg font-bold text-white mb-1">${proposal.title}</h2>
-                            <a href="https://gov.tools/governance_actions/${proposal.proposal_id}" target="_blank" rel="noopener noreferrer" class="block text-xs text-cyan-400 hover:underline mb-4 break-all font-mono">
+                            <a href="${config.govTools}/governance_actions/${proposal.proposal_id}" target="_blank" rel="noopener noreferrer" class="block text-xs text-cyan-400 hover:underline mb-4 break-all font-mono">
                                 ID: ${proposal.proposal_id}
                             </a>
-                            
-                            <div class="mb-4">
-                                <div class="flex justify-between items-end mb-1">
-                                    <span class="text-sm font-medium text-green-400">DRep "Yes" Votes</span>
-                                    <span class="text-xl font-bold text-green-300">${yesPct}%</span>
-                                </div>
-                                <div class="relative w-full bg-gray-700 rounded-full h-3">
-                                    <div class="bg-gradient-to-r from-green-500 to-emerald-400 h-3 rounded-full" style="width: ${yesPct}%"></div>
-                                    <div class="absolute top-[-2px] bottom-[-2px] left-[67%] w-0.5 bg-yellow-300 transform -translate-x-1/2" title="67% Approval Threshold"></div>
-                                </div>
+                            <div>
+                                <div class="flex justify-between items-end mb-1"><span class="text-sm font-medium text-green-400">DRep "Yes" Votes</span><span class="text-xl font-bold text-green-300">${drepYesPct}%</span></div>
+                                <div class="relative w-full bg-gray-700 rounded-full h-3"><div class="bg-gradient-to-r from-green-500 to-emerald-400 h-3 rounded-full" style="width: ${drepYesPct}%"></div>${drepThresholdHTML}</div>
                             </div>
+                            <div class="grid grid-cols-3 gap-2 text-center text-sm mt-3">
+                                <div><p class="text-gray-400">Yes</p><p class="font-semibold">${proposal.drep_yes_votes_cast.toLocaleString()}</p></div>
+                                <div><p class="text-gray-400">No</p><p class="font-semibold">${proposal.drep_no_votes_cast.toLocaleString()}</p></div>
+                                <div><p class="text-gray-400">Abstain</p><p class="font-semibold">${proposal.drep_abstain_votes_cast.toLocaleString()}</p></div>
+                            </div>
+                            ${spoSectionHTML}
+                            ${expirationHTML}
                         </div>
-                        <div class="mt-auto pt-4 border-t border-gray-700/50 flex justify-around text-center">
-                            <div>
-                                <p class="text-sm text-gray-400">"Yes" Votes Cast</p>
-                                <p class="text-lg font-semibold text-white">${yesVotes}</p>
-                            </div>
-                            <div>
-                                <p class="text-sm text-gray-400">"Abstain" Votes Cast</p>
-                                <p class="text-lg font-semibold text-white">${abstainVotes}</p>
-                            </div>
+                        <div class="mt-6 pt-4 border-t border-gray-700/50 flex flex-col gap-3">
+                            <button class="view-votes-btn w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-colors" data-proposal-id="${proposal.proposal_id}" data-voter-type="DRep">View DRep Votes</button>
+                            ${hasSpoVotes ? `<button class="view-votes-btn w-full bg-purple-700 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors" data-proposal-id="${proposal.proposal_id}" data-voter-type="SPO">View SPO Votes</button>` : ''}
                         </div>
                     `;
                     grid.appendChild(card);
@@ -174,92 +311,158 @@
                 proposalsContainer.appendChild(grid);
             }
 
-            /**
-             * Filters and sorts the master list of proposals, then calls the render function.
-             */
             function applyFiltersAndSorting() {
+                if (!allFetchedProposals) return;
                 const filterText = searchInput.value.toLowerCase();
+                const typeFilter = typeFilterSelect.value;
                 const sortValue = sortSelect.value;
                 
-                // 1. Apply filter
-                let filteredProposals = allFetchedProposals.filter(p => 
-                    p.title.toLowerCase().includes(filterText)
-                );
+                let filteredProposals = allFetchedProposals
+                    .filter(p => p.title.toLowerCase().includes(filterText))
+                    .filter(p => typeFilter === 'all' || p.type === typeFilter);
 
-                // 2. Apply sorting
                 filteredProposals.sort((a, b) => {
                     switch (sortValue) {
-                        case 'yes-pct-asc':
-                            return a.drep_yes_pct - b.drep_yes_pct;
-                        case 'votes-cast-desc':
-                            return b.drep_yes_votes_cast - a.drep_yes_votes_cast;
-                        case 'votes-cast-asc':
-                            return a.drep_yes_votes_cast - b.drep_yes_votes_cast;
-                        case 'yes-pct-desc':
-                        default:
-                            return b.drep_yes_pct - a.drep_yes_pct;
+                        case 'drep-yes-pct-asc': return a.drep_yes_pct - b.drep_yes_pct;
+                        case 'spo-yes-pct-desc': return b.spo_yes_pct - a.spo_yes_pct;
+                        case 'spo-yes-pct-asc': return a.spo_yes_pct - b.spo_yes_pct;
+                        case 'drep-yes-pct-desc': default: return b.drep_yes_pct - a.drep_yes_pct;
                     }
                 });
                 
                 renderProposals(filteredProposals);
             }
             
-            // Add event listeners for the controls
-            searchInput.addEventListener('input', applyFiltersAndSorting);
-            sortSelect.addEventListener('change', applyFiltersAndSorting);
+            // --- RENDER MODAL VOTES ---
+            function renderModalVotes() {
+                const showOnlyWithRationale = rationaleFilterCheckbox.checked;
+                const votesToRender = showOnlyWithRationale
+                    ? currentModalVotes.filter(v => v.meta_url)
+                    : currentModalVotes;
 
-            /**
-             * Main function to fetch, process, and display proposal data.
-             */
-            async function fetchAndDisplayProposals() {
-                const proxyUrl = (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
+                const config = networkConfigs[currentNetwork];
+                const voteColors = { Yes: 'text-green-400', No: 'text-red-400', Abstain: 'text-yellow-400' };
+                const isSPO = currentModalVoterType === 'SPO';
+                const idHeader = isSPO ? 'SPO ID' : 'DRep ID';
+
+                if (votesToRender.length === 0) {
+                    modalContent.innerHTML = `<p class="text-gray-400 text-center">No ${showOnlyWithRationale ? 'votes with rationale' : 'votes'} found for this proposal.</p>`;
+                    return;
+                }
+                
+                let voteListHTML = `<div class="grid grid-cols-3 gap-4 text-left font-bold text-gray-400 pb-2 border-b border-gray-600"><span>${idHeader}</span><span class="text-center">Rationale</span><span class="text-right">Vote</span></div>`;
+                voteListHTML += votesToRender.map(vote => {
+                    const rationaleLink = vote.meta_url ? `<a href="${vote.meta_url.startsWith('ipfs://') ? `https://ipfs.io/ipfs/${vote.meta_url.substring(7)}` : vote.meta_url}" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:underline">📄 View</a>` : `<span class="text-gray-600">-</span>`;
+                    const explorerLink = isSPO ? `${config.cExplorer}/pool/${vote.voter_id}` : `${config.govTools}/drep_directory/${vote.voter_id}`;
+                    return `<div class="grid grid-cols-3 gap-4 items-center py-2 border-b border-gray-700 last:border-b-0"><a href="${explorerLink}" target="_blank" rel="noopener noreferrer" class="font-mono text-sm text-cyan-400 hover:underline break-all pr-4">${vote.voter_id}</a><div class="text-center">${rationaleLink}</div><span class="font-bold text-sm text-right ${voteColors[vote.vote] || 'text-gray-400'}">${vote.vote}</span></div>`;
+                }).join('');
+                modalContent.innerHTML = `<div>${voteListHTML}</div>`;
+            }
+
+            // --- Data Fetching ---
+            async function fetchAndShowVotes(proposalId, voterType) {
+                modal.classList.remove('hidden');
+                modalContent.innerHTML = `<div class="flex justify-center items-center p-8"><svg class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>`;
+                
+                currentModalVoterType = voterType;
+                modalTitle.textContent = `${voterType} Votes`;
+                rationaleFilterCheckbox.checked = false;
+
                 try {
-                    const proposalListEndpoint = `${apiBase}/proposal_list`;
-                    const proposalListResponse = await fetch(proxyUrl(proposalListEndpoint));
-                    if (!proposalListResponse.ok) throw new Error(`Failed to fetch proposal list via proxy. Status: ${proposalListResponse.status}`);
-                    const allProposals = await proposalListResponse.json();
+                    const config = networkConfigs[currentNetwork];
+                    const proxyUrl = (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
+                    const endpoint = `${config.apiBase}/proposal_votes?_proposal_id=${proposalId}`;
+                    const response = await fetch(proxyUrl(endpoint));
+                    if (!response.ok) throw new Error(`Failed to fetch votes. Status: ${response.status}`);
+                    const allVotes = await response.json();
 
-                    const activeProposals = allProposals.filter(p => p.ratified_epoch === null && p.enacted_epoch === null && p.dropped_epoch === null && p.expired_epoch === null);
-
-                    const proposalPromises = activeProposals.map(async (proposal) => {
-                        try {
-                            const summaryEndpoint = `${apiBase}/proposal_voting_summary?_proposal_id=${proposal.proposal_id}`;
-                            const summaryResponse = await fetch(proxyUrl(summaryEndpoint));
-                            if (!summaryResponse.ok) return null;
-                            const summary = await summaryResponse.json();
-                            if (summary && summary.length > 0) {
-                                return {
-                                    proposal_id: proposal.proposal_id,
-                                    title: proposal.meta_json?.body?.title || 'No Title Found',
-                                    summaryData: summary[0]
-                                };
-                            }
-                            return null;
-                        } catch (err) { return null; }
-                    });
-
-                    const detailedProposals = (await Promise.all(proposalPromises)).filter(p => p !== null);
-
-                    allFetchedProposals = detailedProposals.map(p => ({
-                        proposal_id: p.proposal_id,
-                        title: p.title,
-                        drep_yes_pct: parseFloat(p.summaryData.drep_yes_pct || 0),
-                        drep_yes_votes_cast: parseInt(p.summaryData.drep_yes_votes_cast || 0, 10),
-                        drep_abstain_votes_cast: parseInt(p.summaryData.drep_abstain_votes_cast || 0, 10)
-                    }));
+                    currentModalVotes = allVotes.filter(v => v.voter_role === voterType);
+                    modalTitle.textContent = `${voterType} Votes (${currentModalVotes.length} total)`;
+                    renderModalVotes();
                     
-                    loadingIndicator.remove(); // Remove loading indicator once data is processed
-                    applyFiltersAndSorting(); // Initial render with default sorting
-
                 } catch (error) {
-                    console.error("An error occurred:", error);
-                    displayError(error.message || "Could not connect to the API. This may be an issue with the CORS proxy.");
-                } finally {
-                    lastUpdatedElement.textContent = new Date().toLocaleString();
+                    modalContent.innerHTML = `<p class="text-red-400 text-center">${error.message}</p>`;
                 }
             }
 
-            // Initial call to start the process
+            async function fetchAndDisplayProposals() {
+                showLoading();
+                const config = networkConfigs[currentNetwork];
+                const proxyUrl = (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
+                try {
+                    const proposalListEndpoint = `${config.apiBase}/proposal_list`;
+                    const proposalListResponse = await fetch(proxyUrl(proposalListEndpoint));
+                    if (!proposalListResponse.ok) throw new Error(`Failed to fetch proposal list. Status: ${proposalListResponse.status}`);
+                    const allProposalsFromApi = await proposalListResponse.json();
+
+                    const activeProposals = allProposalsFromApi
+                        .filter(p => p.ratified_epoch === null && p.enacted_epoch === null && p.dropped_epoch === null && p.expired_epoch === null)
+                        .filter(p => p.proposal_type !== 'CommitteeNoConfidence');
+                    
+                    const proposalPromises = activeProposals.map(async (proposal) => {
+                        try {
+                            const summaryEndpoint = `${config.apiBase}/proposal_voting_summary?_proposal_id=${proposal.proposal_id}`;
+                            const summaryResponse = await fetch(proxyUrl(summaryEndpoint));
+                            if (!summaryResponse.ok) return null;
+                            const summary = await summaryResponse.json();
+                            
+                            if (summary && summary.length > 0) {
+                                const d = summary[0];
+                                return {
+                                    proposal_id: proposal.proposal_id,
+                                    type: proposal.proposal_type,
+                                    title: proposal.meta_json?.body?.title || 'No Title Found',
+                                    expiration_epoch: proposal.expiration,
+                                    expiration_timestamp: getExpirationTimestamp(proposal.expiration),
+                                    drep_yes_pct: parseFloat(d.drep_yes_pct || 0), drep_yes_votes_cast: parseInt(d.drep_yes_votes_cast || 0, 10),
+                                    drep_no_votes_cast: parseInt(d.drep_no_votes_cast || 0, 10), drep_abstain_votes_cast: parseInt(d.drep_abstain_votes_cast || 0, 10),
+                                    spo_yes_pct: parseFloat(d.spo_yes_pct || 0), spo_yes_votes_cast: parseInt(d.spo_yes_votes_cast || 0, 10),
+                                    spo_no_votes_cast: parseInt(d.spo_no_votes_cast || 0, 10), spo_abstain_votes_cast: parseInt(d.spo_abstain_votes_cast || 0, 10),
+                                };
+                            }
+                            return null;
+                        } catch (err) { 
+                            console.warn(`Error processing proposal ${proposal.proposal_id}:`, err);
+                            return null; 
+                        }
+                    });
+
+                    allFetchedProposals = (await Promise.all(proposalPromises)).filter(p => p !== null);
+                    applyFiltersAndSorting();
+
+                } catch (error) {
+                    console.error("An error occurred:", error);
+                    displayError(error.message || "Could not connect to the API.");
+                } finally {
+                    lastUpdatedElement.textContent = new Date().toLocaleString();
+                    setControlsDisabled(false);
+                }
+            }
+
+            // --- Event Listeners ---
+            [searchInput, sortSelect, typeFilterSelect].forEach(el => el.addEventListener('change', applyFiltersAndSorting));
+            searchInput.addEventListener('input', applyFiltersAndSorting);
+            rationaleFilterCheckbox.addEventListener('change', renderModalVotes);
+            
+            networkSelect.addEventListener('change', (e) => {
+                currentNetwork = e.target.value;
+                networkNameSpan.textContent = networkConfigs[currentNetwork].name;
+                allFetchedProposals = [];
+                fetchAndDisplayProposals();
+            });
+
+            proposalsContainer.addEventListener('click', (e) => {
+                const button = e.target.closest('.view-votes-btn');
+                if (button) {
+                    const { proposalId, voterType } = button.dataset;
+                    fetchAndShowVotes(proposalId, voterType);
+                }
+            });
+
+            modalCloseBtn.addEventListener('click', () => modal.classList.add('hidden'));
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+
+            // --- Initial Load ---
             fetchAndDisplayProposals();
         });
     </script>
