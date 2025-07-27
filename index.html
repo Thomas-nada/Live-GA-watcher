@@ -235,6 +235,7 @@
             let currentModalVoterType = ''; // 'DRep', 'DRepHistory'
             let voterVoteHistory = [];
             let dataCache = { proposals: false, dreps: false };
+            const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyNKJ4hBBc0TA3TbWqXW0w3p0uOQhJ9zJ5WAi8sEHylf_scxqyUvHw6_DY0hizGl032/exec';
 
             const markdownConverter = new showdown.Converter({ simplifiedAutoLink: true, openLinksInNewWindow: true });
             const networkConfigs = {
@@ -544,35 +545,46 @@
             // --- AI Summary Logic ---
             async function fetchAndSummarizeProposal(proposalId) {
                 aiSummaryModal.classList.remove('hidden');
-                aiModalContent.innerHTML = `<div class="flex justify-center items-center p-8"><svg class="animate-spin h-6 w-6 text-white"></svg><p class="ml-4">Generating summary with Gemini...</p></div>`;
-                const proposal = allFetchedProposals.find(p => p.proposal_id === proposalId);
-                if (!proposal) {
-                    aiModalContent.innerHTML = `<p class="text-red-400">Could not find proposal details.</p>`;
-                    return;
-                }
-                aiModalTitle.textContent = `✨ Summary for: ${proposal.title}`;
+                aiModalContent.innerHTML = `<div class="flex justify-center items-center p-8"><svg class="animate-spin h-6 w-6 text-white"></svg><p class="ml-4">Generating summary...</p></div>`;
+                
                 try {
+                    if (!GOOGLE_APPS_SCRIPT_URL || GOOGLE_APPS_SCRIPT_URL === 'YOUR_WEB_APP_URL_HERE') {
+                        throw new Error("Google Apps Script URL is not configured. Please update the code.");
+                    }
+
+                    const proposal = allFetchedProposals.find(p => p.proposal_id === proposalId);
+                    if (!proposal) {
+                        throw new Error("Could not find proposal details.");
+                    }
+                    aiModalTitle.textContent = `✨ Summary for: ${proposal.title}`;
+                    
                     const proposalText = `Title: ${proposal.title}\n\nAbstract: ${proposal.abstract}\n\nMotivation: ${proposal.motivation}\n\nRationale: ${proposal.rationale}`;
                     if (proposalText.trim().length < 50) {
                         aiModalContent.innerHTML = `<p class="text-yellow-400">Not enough metadata to generate a summary.</p>`;
                         return;
                     }
-                    const prompt = `You are an expert AI assistant for Cardano DReps. Your task is to provide a concise, neutral summary of a governance proposal, focusing on the essential information a DRep needs for a quick assessment. Keep it brief. Structure your response in Markdown with these sections:
-- **Objective:** State the primary goal in one sentence.
-- **Proposed Change:** Clearly describe the specific action. For a parameter change, state old/new values. For a treasury withdrawal, state amount/recipient.
-- **Justification:** Briefly summarize the core reason for this change.
-Here is the proposal text:\n---\n${proposalText}\n---`;
+
+                    const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ text: proposalText }),
+                        headers: {
+                            'Content-Type': 'text/plain;charset=utf-8', // Required for Apps Script
+                        },
+                    });
                     
-                    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-                    const apiKey = ""; // Handled by environment
-                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                    if (!response.ok) throw new Error(`Gemini API Error: ${response.status}`);
+                    if (!response.ok) {
+                         throw new Error(`Request to proxy failed with status ${response.status}`);
+                    }
+
                     const result = await response.json();
-                    if (result.candidates && result.candidates.length > 0) {
-                        aiModalContent.innerHTML = markdownConverter.makeHtml(result.candidates[0].content.parts[0].text);
-                    } else {
-                        throw new Error("No summary generated. Response may be empty or blocked.");
+                    
+                    if (result.summary) {
+                        aiModalContent.innerHTML = markdownConverter.makeHtml(result.summary);
+                    } else if (result.error) {
+                        throw new Error(result.error);
+                    }
+                    else {
+                        throw new Error("No summary was returned from the function.");
                     }
                 } catch (err) {
                     aiModalContent.innerHTML = `<p class="text-red-400">Failed to generate summary: ${err.message}</p>`;
