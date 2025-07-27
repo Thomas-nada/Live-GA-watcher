@@ -55,25 +55,33 @@
             transform: translateX(-50%);
             z-index: 10;
         }
-        select:disabled {
+        select:disabled, button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
-        .rationale-content {
-            background-color: #1f2937; /* bg-gray-800 */
-            border-left: 3px solid #0891b2; /* border-cyan-600 */
-        }
-        .rationale-content h1, .rationale-content h2, .rationale-content h3 {
+        .ai-summary-content h1, .ai-summary-content h2, .ai-summary-content h3 {
             font-weight: bold;
             margin-top: 1rem;
             margin-bottom: 0.5rem;
         }
-        .rationale-content h1 { font-size: 1.25rem; }
-        .rationale-content h2 { font-size: 1.1rem; }
-        .rationale-content ul { list-style-type: disc; margin-left: 1.5rem; }
-        .rationale-content ol { list-style-type: decimal; margin-left: 1.5rem; }
-        .rationale-content a { color: #67e8f9; text-decoration: underline; }
-        .rationale-content p { margin-bottom: 0.5rem; }
+        .ai-summary-content h1 { font-size: 1.25rem; }
+        .ai-summary-content h2 { font-size: 1.1rem; }
+        .ai-summary-content ul { list-style-type: disc; margin-left: 1.5rem; }
+        .ai-summary-content ol { list-style-type: decimal; margin-left: 1.5rem; }
+        .ai-summary-content a { color: #67e8f9; text-decoration: underline; }
+        .ai-summary-content p { margin-bottom: 0.5rem; }
+
+        .gemini-button {
+            background: linear-gradient(to right, #4f46e5, #9333ea);
+        }
+        .nav-button[aria-selected="true"] {
+            background-color: #0891b2; /* cyan-600 */
+            color: white;
+        }
+         .nav-button[aria-selected="false"] {
+            background-color: #374151; /* gray-700 */
+            color: #d1d5db; /* gray-300 */
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-200 antialiased">
@@ -82,41 +90,58 @@
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
 
         <!-- Header Section -->
-        <header class="text-center mb-8">
-            <h1 class="text-3xl sm:text-4xl font-bold text-white mb-2">Active Cardano Governance Proposals</h1>
-            <p class="text-gray-400">Live DRep and SPO voting data for <span id="network-name" class="font-bold text-cyan-400">Mainnet</span></p>
+        <header class="text-center mb-4">
+            <h1 class="text-3xl sm:text-4xl font-bold text-white mb-2">Cardano Governance Dashboard</h1>
+            <p class="text-gray-400">Live data for <span id="network-name" class="font-bold text-cyan-400">Mainnet</span></p>
         </header>
 
-        <!-- Filter and Sort Controls -->
-        <div id="controls" class="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <select id="network-select" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
-                <option value="mainnet">Network: Mainnet</option>
-                <option value="preprod">Network: Preprod</option>
-                <option value="preview">Network: Preview</option>
-            </select>
-            <select id="type-filter" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
-                <option value="all">Filter by Type: All</option>
-                <option value="ParameterChange">Parameter Change</option>
-                <option value="HardForkInitiation">Hard-Fork Initiation</option>
-                <option value="TreasuryWithdrawals">Treasury Withdrawals</option>
-                <option value="MotionOfNoConfidence">Motion of No-Confidence</option>
-                <option value="NewCommittee">New Committee</option>
-                <option value="UpdateToConstitution">Update Constitution</option>
-                <option value="InfoAction">Info Action</option>
-            </select>
-            <input type="text" id="search-filter" placeholder="Filter by title..." class="sm:col-span-2 lg:col-span-1 flex-grow bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
-            <select id="sort-select" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
-                <option value="drep-yes-pct-desc">Sort by: Highest DRep Yes %</option>
-                <option value="drep-yes-pct-asc">Sort by: Lowest DRep Yes %</option>
-                <option value="spo-yes-pct-desc">Sort by: Highest SPO Yes %</option>
-                <option value="spo-yes-pct-asc">Sort by: Lowest SPO Yes %</option>
-            </select>
+        <!-- Navigation -->
+        <nav class="flex flex-wrap justify-center mb-8 bg-gray-800 rounded-lg p-1">
+            <button id="nav-proposals" class="nav-button font-semibold py-2 px-6 rounded-md transition-colors" aria-selected="true">Proposals</button>
+            <button id="nav-drep-directory" class="nav-button font-semibold py-2 px-6 rounded-md transition-colors" aria-selected="false">DRep Directory</button>
+        </nav>
+
+        <!-- Proposals Page -->
+        <div id="proposals-page">
+            <!-- Filter and Sort Controls -->
+            <div id="controls" class="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <select id="network-select" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                    <option value="mainnet">Network: Mainnet</option>
+                    <option value="preprod">Network: Preprod</option>
+                    <option value="preview">Network: Preview</option>
+                </select>
+                <select id="type-filter" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                    <option value="all">Filter by Type: All</option>
+                    <option value="ParameterChange">Parameter Change</option>
+                    <option value="HardForkInitiation">Hard-Fork Initiation</option>
+                    <option value="TreasuryWithdrawals">Treasury Withdrawals</option>
+                    <option value="MotionOfNoConfidence">Motion of No-Confidence</option>
+                    <option value="NewCommittee">New Committee</option>
+                    <option value="UpdateToConstitution">Update Constitution</option>
+                    <option value="InfoAction">Info Action</option>
+                </select>
+                <input type="text" id="search-filter" placeholder="Filter by title..." class="sm:col-span-2 lg:col-span-1 flex-grow bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                <select id="sort-select" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                    <option value="drep-yes-pct-desc">Sort by: Highest DRep Yes %</option>
+                    <option value="drep-yes-pct-asc">Sort by: Lowest DRep Yes %</option>
+                </select>
+            </div>
+            <main id="proposals-container"><!-- Proposals will be injected here --></main>
         </div>
 
-        <!-- Main Content: Loading State and Results Grid -->
-        <main id="proposals-container">
-            <!-- Loading Indicator will be injected here -->
-        </main>
+        <!-- DRep Directory Page -->
+        <div id="drep-directory-page" class="hidden">
+            <div class="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <input type="text" id="drep-search-filter" placeholder="Search by DRep ID..." class="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                 <select id="drep-status-filter" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                    <option value="all">Filter by Status: All</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="retired">Retired</option>
+                </select>
+            </div>
+            <main id="drep-list-container"><!-- DRep list will be injected here --></main>
+        </div>
         
         <!-- Footer -->
         <footer class="text-center mt-12 text-gray-500 text-sm space-y-2">
@@ -124,348 +149,484 @@
              <p>UI inspired by a <a href="https://github.com/IntersectMBO/governance-scripts/blob/main/scripts/query-live-actions.sh" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">script</a> by <a href="https://github.com/Ryun1" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:underline">Ryun1</a>.</p>
             <p>Last updated: <span id="last-updated"></span></p>
         </footer>
-
     </div>
 
-    <!-- Votes Modal -->
+    <!-- Modals -->
     <div id="votes-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
             <div class="p-4 border-b border-gray-700">
                 <div class="flex justify-between items-center mb-3">
                     <h3 id="modal-title" class="text-xl font-bold text-white">Votes</h3>
                     <button id="modal-close-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <input type="checkbox" id="rationale-filter" class="bg-gray-700 border-gray-600 rounded focus:ring-cyan-500 h-4 w-4 text-cyan-600">
+                    <input type="checkbox" id="rationale-filter" class="bg-gray-700 border border-gray-600 rounded focus:ring-cyan-500 h-4 w-4 text-cyan-600">
                     <label for="rationale-filter" class="text-sm text-gray-300">Show only votes with rationale</label>
                 </div>
             </div>
-            <div id="modal-content" class="p-6 overflow-y-auto modal-scrollbar">
-                <!-- Votes will be loaded here -->
-            </div>
+            <div id="modal-content" class="p-6 overflow-y-auto modal-scrollbar"><!-- Vote content here --></div>
         </div>
     </div>
 
-    <!-- JavaScript Logic -->
+    <div id="ai-summary-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h3 id="ai-modal-title" class="text-xl font-bold text-white">✨ AI-Powered Summary</h3>
+                <button id="ai-modal-close-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div id="ai-modal-content" class="p-6 overflow-y-auto modal-scrollbar ai-summary-content"><!-- AI Summary here --></div>
+        </div>
+    </div>
+
+    <div id="rationale-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h3 id="rationale-modal-title" class="text-xl font-bold text-white">Vote Rationale</h3>
+                <button id="rationale-modal-close-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+            </div>
+            <div id="rationale-modal-content" class="p-6 overflow-y-auto modal-scrollbar ai-summary-content"><!-- Rationale content will be loaded here --></div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- DOM Elements ---
             const proposalsContainer = document.getElementById('proposals-container');
+            const drepListContainer = document.getElementById('drep-list-container');
             const lastUpdatedElement = document.getElementById('last-updated');
+            const networkSelect = document.getElementById('network-select');
+            const networkNameSpan = document.getElementById('network-name');
+
+            // Page containers and nav
+            const proposalsPage = document.getElementById('proposals-page');
+            const drepDirectoryPage = document.getElementById('drep-directory-page');
+            const navProposals = document.getElementById('nav-proposals');
+            const navDRepDirectory = document.getElementById('nav-drep-directory');
+
+            // Proposal page controls
             const searchInput = document.getElementById('search-filter');
             const sortSelect = document.getElementById('sort-select');
-            const networkSelect = document.getElementById('network-select');
             const typeFilterSelect = document.getElementById('type-filter');
-            const networkNameSpan = document.getElementById('network-name');
-            const modal = document.getElementById('votes-modal');
+
+            // DRep page controls
+            const drepSearchInput = document.getElementById('drep-search-filter');
+            const drepStatusFilter = document.getElementById('drep-status-filter');
+
+            // Modals
+            const votesModal = document.getElementById('votes-modal');
             const modalTitle = document.getElementById('modal-title');
             const modalContent = document.getElementById('modal-content');
             const modalCloseBtn = document.getElementById('modal-close-btn');
             const rationaleFilterCheckbox = document.getElementById('rationale-filter');
+            const aiSummaryModal = document.getElementById('ai-summary-modal');
+            const aiModalTitle = document.getElementById('ai-modal-title');
+            const aiModalContent = document.getElementById('ai-modal-content');
+            const aiModalCloseBtn = document.getElementById('ai-modal-close-btn');
+            const rationaleModal = document.getElementById('rationale-modal');
+            const rationaleModalTitle = document.getElementById('rationale-modal-title');
+            const rationaleModalContent = document.getElementById('rationale-modal-content');
+            const rationaleModalCloseBtn = document.getElementById('rationale-modal-close-btn');
 
             // --- State and Configuration ---
             let allFetchedProposals = [];
+            let allFetchedDReps = [];
             let currentNetwork = 'mainnet';
             let currentModalVotes = [];
-            let currentModalVoterType = '';
-            const markdownConverter = new showdown.Converter();
+            let currentModalVoterType = ''; // 'DRep', 'DRepHistory'
+            let voterVoteHistory = [];
+            let dataCache = { proposals: false, dreps: false };
 
+            const markdownConverter = new showdown.Converter({ simplifiedAutoLink: true, openLinksInNewWindow: true });
             const networkConfigs = {
                 mainnet: { apiBase: "https://api.koios.rest/api/v1", govTools: "https://gov.tools", cExplorer: "https://cexplorer.io", name: "Mainnet" },
                 preprod: { apiBase: "https://preprod.koios.rest/api/v1", govTools: "https://preprod.gov.tools", cExplorer: "https://preprod.cexplorer.io", name: "Pre-production" },
                 preview: { apiBase: "https://preview.koios.rest/api/v1", govTools: "https://preview.gov.tools", cExplorer: "https://preview.cexplorer.io", name: "Preview" }
             };
-
             const typeStyles = {
                 'MotionOfNoConfidence': { text: 'Motion of No-Confidence', classes: 'bg-red-800 text-red-100 border-red-600' },
                 'NewCommittee': { text: 'New Committee', classes: 'bg-blue-800 text-blue-100 border-blue-600' },
                 'UpdateToConstitution': { text: 'Update Constitution', classes: 'bg-indigo-800 text-indigo-100 border-indigo-600' },
                 'HardForkInitiation': { text: 'Hard Fork', classes: 'bg-amber-800 text-amber-100 border-amber-600' },
                 'TreasuryWithdrawals': { text: 'Treasury Withdrawal', classes: 'bg-green-800 text-green-100 border-green-600' },
-                'ParameterChange': { text: 'Param Change', classes: 'bg-teal-800 text-teal-100 border-teal-600'},
+                'ParameterChange': { text: 'Parameter Change', classes: 'bg-teal-800 text-teal-100 border-teal-600'},
                 'InfoAction': { text: 'Info Action', classes: 'bg-gray-700 text-gray-200 border-gray-500' },
                 'Default': { text: 'Unknown Type', classes: 'bg-gray-700 text-gray-200 border-gray-500' }
             };
-            
             const jokes = ["Waking up the Koios API...", "Consulting the Ouroboros...", "Syncing with the epoch boundary...", "Delegating our fetch request..."];
+            const ANCHOR_EPOCH = 492, ANCHOR_EPOCH_END_MS = new Date('2024-06-23T21:45:00Z').getTime(), EPOCH_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
 
-            // --- Date Calculation ---
-            const ANCHOR_EPOCH = 577;
-            const ANCHOR_EPOCH_END_MS = new Date('2025-08-17T21:45:00Z').getTime();
-            const EPOCH_DURATION_MS = 5 * 24 * 60 * 60 * 1000;
-
-            function getExpirationTimestamp(expirationEpoch) {
-                if (!expirationEpoch) return null;
-                const epochDiff = expirationEpoch - ANCHOR_EPOCH;
-                return ANCHOR_EPOCH_END_MS + (epochDiff * EPOCH_DURATION_MS);
-            }
-
-            // --- Helper Functions ---
-            function pascalToTitleCase(s) {
-                if (!s) return '';
-                return s.replace(/([A-Z])/g, ' $1').trim();
-            }
-
-            // --- Threshold Logic ---
-            function getThresholds(proposalType) {
-                switch (proposalType) {
-                    case 'TreasuryWithdrawals': return { drep: 0.67, spo: null };
-                    case 'HardForkInitiation': return { drep: 0.60, spo: 0.51 };
-                    case 'MotionOfNoConfidence': return { drep: 0.67, spo: 0.51 };
-                    case 'NewCommittee': return { drep: 0.67, spo: 0.51 };
-                    case 'UpdateToConstitution': return { drep: 0.75, spo: null };
-                    case 'ParameterChange': return { drep: 0.67, spo: 0.51 };
-                    case 'InfoAction': return { drep: null, spo: null };
-                    default: return { drep: null, spo: null };
-                }
-            }
-
-            // --- UI Functions ---
-            function showLoading() {
+            // --- Helper & Utility Functions ---
+            const getExpirationTimestamp = (e) => e ? ANCHOR_EPOCH_END_MS + ((e - ANCHOR_EPOCH) * EPOCH_DURATION_MS) : null;
+            const pascalToTitleCase = (s) => s ? s.replace(/([A-Z])/g, ' $1').trim() : '';
+            const proxyUrl = (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
+            const showLoading = (container) => {
                 const joke = jokes[Math.floor(Math.random() * jokes.length)];
-                proposalsContainer.innerHTML = `<div id="loading-indicator" class="flex flex-col items-center justify-center text-center p-10"><svg class="animate-spin h-8 w-8 text-white mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p class="text-lg font-medium">${joke}</p><p class="text-gray-500">Fetching data for ${networkConfigs[currentNetwork].name}.</p></div>`;
-                setControlsDisabled(true);
-            }
+                container.innerHTML = `<div class="flex flex-col items-center justify-center text-center p-10"><svg class="animate-spin h-8 w-8 text-white mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p class="text-lg font-medium">${joke}</p><p class="text-gray-500">Fetching data for ${networkConfigs[currentNetwork].name}.</p></div>`;
+            };
+            const displayError = (container, message) => {
+                container.innerHTML = `<div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg"><strong class="font-bold">Error:</strong> <span>${message}</span></div>`;
+            };
+            const setControlsDisabled = (disabled) => [networkSelect, searchInput, sortSelect, typeFilterSelect, drepSearchInput, drepStatusFilter].forEach(el => el.disabled = disabled);
 
-            function displayError(message) {
-                proposalsContainer.innerHTML = `<div id="error-message" class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg relative" role="alert"><strong class="font-bold">Error:</strong> <span class="block sm:inline">${message}</span></div>`;
-                setControlsDisabled(false);
-            }
-
-            function setControlsDisabled(disabled) {
-                [networkSelect, searchInput, sortSelect, typeFilterSelect].forEach(el => el.disabled = disabled);
-            }
-
-            function renderProposals(proposalsToRender) {
-                proposalsContainer.innerHTML = '';
-                setControlsDisabled(false);
+            // --- Page Navigation ---
+            function showPage(page) {
+                proposalsPage.classList.toggle('hidden', page !== 'proposals');
+                drepDirectoryPage.classList.toggle('hidden', page !== 'dreps');
                 
-                if (proposalsToRender.length === 0) {
-                    proposalsContainer.innerHTML = `<div class="text-center p-10 bg-gray-800 rounded-lg col-span-full"><p class="text-lg">No proposals match the current filters on ${networkConfigs[currentNetwork].name}.</p></div>`;
+                navProposals.setAttribute('aria-selected', page === 'proposals');
+                navDRepDirectory.setAttribute('aria-selected', page === 'dreps');
+
+                if (page === 'proposals' && !dataCache.proposals) fetchAndDisplayProposals();
+                if (page === 'dreps' && !dataCache.dreps) fetchAndDisplayDReps();
+            }
+
+            // --- Proposal Page Logic ---
+            const getThresholds = (t) => ({'TreasuryWithdrawals':{drep:0.67,spo:null},'HardForkInitiation':{drep:0.6,spo:0.51},'MotionOfNoConfidence':{drep:0.67,spo:0.51},'NewCommittee':{drep:0.67,spo:0.51},'UpdateToConstitution':{drep:0.75,spo:null},'ParameterChange':{drep:0.67,spo:0.51},'InfoAction':{drep:null,spo:null}})[t]||{drep:null,spo:null};
+            
+            function renderProposals(proposals) {
+                proposalsContainer.innerHTML = '';
+                if (proposals.length === 0) {
+                    proposalsContainer.innerHTML = `<div class="text-center p-10 bg-gray-800 rounded-lg col-span-full"><p class="text-lg">No proposals match filters.</p></div>`;
                     return;
                 }
-
                 const grid = document.createElement('div');
                 grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
-                const config = networkConfigs[currentNetwork];
-
-                proposalsToRender.forEach(proposal => {
+                proposals.forEach(p => {
                     const card = document.createElement('div');
                     card.className = 'bg-gray-800 rounded-xl shadow-lg p-6 flex flex-col transition-all duration-300 hover:shadow-cyan-500/20 hover:ring-1 hover:ring-cyan-800';
-                    
-                    const style = typeStyles[proposal.type] || { ...typeStyles['Default'], text: pascalToTitleCase(proposal.type) };
-                    const typeBadge = `<div class="mb-4"><span class="text-xs font-bold px-3 py-1 rounded-full border ${style.classes}">${style.text.toUpperCase()}</span></div>`;
-
-                    const expirationDate = new Date(proposal.expiration_timestamp);
-                    const expirationHTML = `
-                        <div class="mt-4 pt-4 border-t border-gray-600/50 flex flex-col gap-1 text-sm text-gray-400">
-                            <div class="flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock flex-shrink-0" viewBox="0 0 16 16">
-                                    <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/>
-                                    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/>
-                                </svg>
-                                <span>Expires in Epoch: <strong>${proposal.expiration_epoch}</strong></span>
-                            </div>
-                            <div class="text-xs text-gray-500 pl-6">
-                                (${expirationDate.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })})
-                            </div>
-                        </div>`;
-
-                    const drepYesPct = parseFloat(proposal.drep_yes_pct).toFixed(2);
-                    const spoYesPct = parseFloat(proposal.spo_yes_pct).toFixed(2);
-                    const hasSpoVotes = proposal.spo_yes_votes_cast + proposal.spo_no_votes_cast + proposal.spo_abstain_votes_cast > 0;
-                    
-                    const thresholds = getThresholds(proposal.type);
-
-                    let drepThresholdHTML = thresholds.drep !== null ? `<div class="threshold-line bg-yellow-300" style="left: ${thresholds.drep * 100}%;" title="Threshold: ${thresholds.drep * 100}%"></div>` : '';
-                    let spoThresholdHTML = thresholds.spo !== null ? `<div class="threshold-line bg-yellow-300" style="left: ${thresholds.spo * 100}%;" title="Threshold: ${thresholds.spo * 100}%"></div>` : '';
-
-                    let spoSectionHTML = hasSpoVotes ? `<div class="mt-4 pt-4 border-t border-gray-700/50"><div class="mb-4"><div class="flex justify-between items-end mb-1"><span class="text-sm font-medium text-purple-400">SPO "Yes" Votes</span><span class="text-xl font-bold text-purple-300">${spoYesPct}%</span></div><div class="relative w-full bg-gray-700 rounded-full h-3"><div class="bg-gradient-to-r from-purple-500 to-fuchsia-500 h-3 rounded-full" style="width: ${spoYesPct}%"></div>${spoThresholdHTML}</div></div><div class="grid grid-cols-3 gap-2 text-center text-sm mt-3"><div><p class="text-gray-400">Yes</p><p class="font-semibold">${proposal.spo_yes_votes_cast.toLocaleString()}</p></div><div><p class="text-gray-400">No</p><p class="font-semibold">${proposal.spo_no_votes_cast.toLocaleString()}</p></div><div><p class="text-gray-400">Abstain</p><p class="font-semibold">${proposal.spo_abstain_votes_cast.toLocaleString()}</p></div></div></div>` : '';
+                    const style = typeStyles[p.type] || { ...typeStyles['Default'], text: pascalToTitleCase(p.type) };
+                    const thresholds = getThresholds(p.type);
 
                     card.innerHTML = `
                         <div class="flex-grow">
-                            ${typeBadge}
-                            <h2 class="text-lg font-bold text-white mb-1">${proposal.title}</h2>
-                            <a href="${config.govTools}/governance_actions/${proposal.proposal_id}" target="_blank" rel="noopener noreferrer" class="block text-xs text-cyan-400 hover:underline mb-4 break-all font-mono">
-                                ID: ${proposal.proposal_id}
-                            </a>
+                            <div class="mb-4"><span class="text-xs font-bold px-3 py-1 rounded-full border ${style.classes}">${style.text.toUpperCase()}</span></div>
+                            <h2 class="text-lg font-bold text-white mb-1">${p.title}</h2>
+                            <a href="${networkConfigs[currentNetwork].govTools}/governance_actions/${p.proposal_id}" target="_blank" rel="noopener noreferrer" class="block text-xs text-cyan-400 hover:underline mb-4 break-all font-mono">ID: ${p.proposal_id}</a>
                             <div>
-                                <div class="flex justify-between items-end mb-1"><span class="text-sm font-medium text-green-400">DRep "Yes" Votes</span><span class="text-xl font-bold text-green-300">${drepYesPct}%</span></div>
-                                <div class="relative w-full bg-gray-700 rounded-full h-3"><div class="bg-gradient-to-r from-green-500 to-emerald-400 h-3 rounded-full" style="width: ${drepYesPct}%"></div>${drepThresholdHTML}</div>
+                                <div class="flex justify-between items-end mb-1"><span class="text-sm font-medium text-green-400">DRep "Yes"</span><span class="text-xl font-bold text-green-300">${p.drep_yes_pct.toFixed(2)}%</span></div>
+                                <div class="relative w-full bg-gray-700 rounded-full h-3"><div class="bg-gradient-to-r from-green-500 to-emerald-400 h-3 rounded-full" style="width: ${p.drep_yes_pct}%"></div>${thresholds.drep ? `<div class="threshold-line bg-yellow-300" style="left: ${thresholds.drep*100}%" title="Threshold"></div>` : ''}</div>
                             </div>
                             <div class="grid grid-cols-3 gap-2 text-center text-sm mt-3">
-                                <div><p class="text-gray-400">Yes</p><p class="font-semibold">${proposal.drep_yes_votes_cast.toLocaleString()}</p></div>
-                                <div><p class="text-gray-400">No</p><p class="font-semibold">${proposal.drep_no_votes_cast.toLocaleString()}</p></div>
-                                <div><p class="text-gray-400">Abstain</p><p class="font-semibold">${proposal.drep_abstain_votes_cast.toLocaleString()}</p></div>
+                                <div><p class="text-gray-400">Yes</p><p class="font-semibold">${p.drep_yes_votes_cast.toLocaleString()}</p></div>
+                                <div><p class="text-gray-400">No</p><p class="font-semibold">${p.drep_no_votes_cast.toLocaleString()}</p></div>
+                                <div><p class="text-gray-400">Abstain</p><p class="font-semibold">${p.drep_abstain_votes_cast.toLocaleString()}</p></div>
                             </div>
-                            ${spoSectionHTML}
-                            ${expirationHTML}
                         </div>
                         <div class="mt-6 pt-4 border-t border-gray-700/50 flex flex-col gap-3">
-                            <button class="view-votes-btn w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-colors" data-proposal-id="${proposal.proposal_id}" data-voter-type="DRep">View DRep Votes</button>
-                            ${hasSpoVotes ? `<button class="view-votes-btn w-full bg-purple-700 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors" data-proposal-id="${proposal.proposal_id}" data-voter-type="SPO">View SPO Votes</button>` : ''}
-                        </div>
-                    `;
+                            <button class="summarize-btn w-full gemini-button text-white font-bold py-2 px-4 rounded-lg" data-proposal-id="${p.proposal_id}">✨ Summarize with AI</button>
+                            <button class="view-votes-btn w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg" data-proposal-id="${p.proposal_id}" data-voter-type="DRep">View DRep Votes</button>
+                        </div>`;
                     grid.appendChild(card);
                 });
                 proposalsContainer.appendChild(grid);
             }
 
-            function applyFiltersAndSorting() {
-                if (!allFetchedProposals) return;
+            function applyProposalFilters() {
                 const filterText = searchInput.value.toLowerCase();
                 const typeFilter = typeFilterSelect.value;
                 const sortValue = sortSelect.value;
-                
-                let filteredProposals = allFetchedProposals
+                let filtered = allFetchedProposals
                     .filter(p => p.title.toLowerCase().includes(filterText))
                     .filter(p => typeFilter === 'all' || p.type === typeFilter);
-
-                filteredProposals.sort((a, b) => {
-                    switch (sortValue) {
-                        case 'drep-yes-pct-asc': return a.drep_yes_pct - b.drep_yes_pct;
-                        case 'spo-yes-pct-desc': return b.spo_yes_pct - a.spo_yes_pct;
-                        case 'spo-yes-pct-asc': return a.spo_yes_pct - b.spo_yes_pct;
-                        case 'drep-yes-pct-desc': default: return b.drep_yes_pct - a.drep_yes_pct;
-                    }
+                filtered.sort((a, b) => {
+                    if (sortValue === 'drep-yes-pct-asc') return a.drep_yes_pct - b.drep_yes_pct;
+                    return b.drep_yes_pct - a.drep_yes_pct;
                 });
-                
-                renderProposals(filteredProposals);
-            }
-            
-            // --- RENDER MODAL VOTES ---
-            function renderModalVotes() {
-                const showOnlyWithRationale = rationaleFilterCheckbox.checked;
-                const votesToRender = showOnlyWithRationale
-                    ? currentModalVotes.filter(v => v.meta_url)
-                    : currentModalVotes;
-
-                const config = networkConfigs[currentNetwork];
-                const voteColors = { Yes: 'text-green-400', No: 'text-red-400', Abstain: 'text-yellow-400' };
-                const isSPO = currentModalVoterType === 'SPO';
-                const idHeader = isSPO ? 'SPO ID' : 'DRep ID';
-
-                if (votesToRender.length === 0) {
-                    modalContent.innerHTML = `<p class="text-gray-400 text-center">No ${showOnlyWithRationale ? 'votes with rationale' : 'votes'} found for this proposal.</p>`;
-                    return;
-                }
-                
-                let voteListHTML = `<div class="grid grid-cols-3 gap-4 text-left font-bold text-gray-400 pb-2 border-b border-gray-600"><span>${idHeader}</span><span class="text-center">Rationale</span><span class="text-right">Vote</span></div>`;
-                voteListHTML += votesToRender.map(vote => {
-                    const rationaleLink = vote.meta_url ? `<a href="${vote.meta_url.startsWith('ipfs://') ? `https://ipfs.io/ipfs/${vote.meta_url.substring(7)}` : vote.meta_url}" target="_blank" rel="noopener noreferrer" class="text-cyan-400 hover:underline">📄 View</a>` : `<span class="text-gray-600">-</span>`;
-                    const explorerLink = isSPO ? `${config.cExplorer}/pool/${vote.voter_id}` : `${config.govTools}/drep_directory/${vote.voter_id}`;
-                    return `<div class="grid grid-cols-3 gap-4 items-center py-2 border-b border-gray-700 last:border-b-0"><a href="${explorerLink}" target="_blank" rel="noopener noreferrer" class="font-mono text-sm text-cyan-400 hover:underline break-all pr-4">${vote.voter_id}</a><div class="text-center">${rationaleLink}</div><span class="font-bold text-sm text-right ${voteColors[vote.vote] || 'text-gray-400'}">${vote.vote}</span></div>`;
-                }).join('');
-                modalContent.innerHTML = `<div>${voteListHTML}</div>`;
-            }
-
-            // --- Data Fetching ---
-            async function fetchAndShowVotes(proposalId, voterType) {
-                modal.classList.remove('hidden');
-                modalContent.innerHTML = `<div class="flex justify-center items-center p-8"><svg class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></div>`;
-                
-                currentModalVoterType = voterType;
-                modalTitle.textContent = `${voterType} Votes`;
-                rationaleFilterCheckbox.checked = false;
-
-                try {
-                    const config = networkConfigs[currentNetwork];
-                    const proxyUrl = (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
-                    const endpoint = `${config.apiBase}/proposal_votes?_proposal_id=${proposalId}`;
-                    const response = await fetch(proxyUrl(endpoint));
-                    if (!response.ok) throw new Error(`Failed to fetch votes. Status: ${response.status}`);
-                    const allVotes = await response.json();
-
-                    currentModalVotes = allVotes.filter(v => v.voter_role === voterType);
-                    modalTitle.textContent = `${voterType} Votes (${currentModalVotes.length} total)`;
-                    renderModalVotes();
-                    
-                } catch (error) {
-                    modalContent.innerHTML = `<p class="text-red-400 text-center">${error.message}</p>`;
-                }
+                renderProposals(filtered);
             }
 
             async function fetchAndDisplayProposals() {
-                showLoading();
-                const config = networkConfigs[currentNetwork];
-                const proxyUrl = (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`;
+                showLoading(proposalsContainer);
+                setControlsDisabled(true);
                 try {
-                    const proposalListEndpoint = `${config.apiBase}/proposal_list`;
-                    const proposalListResponse = await fetch(proxyUrl(proposalListEndpoint));
-                    if (!proposalListResponse.ok) throw new Error(`Failed to fetch proposal list. Status: ${proposalListResponse.status}`);
-                    const allProposalsFromApi = await proposalListResponse.json();
-
-                    const activeProposals = allProposalsFromApi
-                        .filter(p => p.ratified_epoch === null && p.enacted_epoch === null && p.dropped_epoch === null && p.expired_epoch === null)
-                        .filter(p => p.proposal_type !== 'CommitteeNoConfidence');
+                    const res = await fetch(proxyUrl(`${networkConfigs[currentNetwork].apiBase}/proposal_list`));
+                    if (!res.ok) throw new Error(`API Error: ${res.status}`);
+                    const proposals = await res.json();
+                    const active = proposals.filter(p => p.ratified_epoch === null && p.enacted_epoch === null && p.dropped_epoch === null && p.expired_epoch === null && p.proposal_type !== 'CommitteeNoConfidence');
                     
-                    const proposalPromises = activeProposals.map(async (proposal) => {
-                        try {
-                            const summaryEndpoint = `${config.apiBase}/proposal_voting_summary?_proposal_id=${proposal.proposal_id}`;
-                            const summaryResponse = await fetch(proxyUrl(summaryEndpoint));
-                            if (!summaryResponse.ok) return null;
-                            const summary = await summaryResponse.json();
-                            
-                            if (summary && summary.length > 0) {
-                                const d = summary[0];
-                                return {
-                                    proposal_id: proposal.proposal_id,
-                                    type: proposal.proposal_type,
-                                    title: proposal.meta_json?.body?.title || 'No Title Found',
-                                    expiration_epoch: proposal.expiration,
-                                    expiration_timestamp: getExpirationTimestamp(proposal.expiration),
-                                    drep_yes_pct: parseFloat(d.drep_yes_pct || 0), drep_yes_votes_cast: parseInt(d.drep_yes_votes_cast || 0, 10),
-                                    drep_no_votes_cast: parseInt(d.drep_no_votes_cast || 0, 10), drep_abstain_votes_cast: parseInt(d.drep_abstain_votes_cast || 0, 10),
-                                    spo_yes_pct: parseFloat(d.spo_yes_pct || 0), spo_yes_votes_cast: parseInt(d.spo_yes_votes_cast || 0, 10),
-                                    spo_no_votes_cast: parseInt(d.spo_no_votes_cast || 0, 10), spo_abstain_votes_cast: parseInt(d.spo_abstain_votes_cast || 0, 10),
-                                };
-                            }
-                            return null;
-                        } catch (err) { 
-                            console.warn(`Error processing proposal ${proposal.proposal_id}:`, err);
-                            return null; 
-                        }
-                    });
+                    const summaries = await Promise.all(active.map(p => 
+                        fetch(proxyUrl(`${networkConfigs[currentNetwork].apiBase}/proposal_voting_summary?_proposal_id=${p.proposal_id}`))
+                        .then(res => res.ok ? res.json() : null)
+                        .then(summary => summary && summary[0] ? ({...p, ...summary[0]}) : null)
+                        .catch(() => null)
+                    ));
 
-                    allFetchedProposals = (await Promise.all(proposalPromises)).filter(p => p !== null);
-                    applyFiltersAndSorting();
-
-                } catch (error) {
-                    console.error("An error occurred:", error);
-                    displayError(error.message || "Could not connect to the API.");
+                    allFetchedProposals = summaries.filter(Boolean).map(p => ({
+                        ...p,
+                        type: p.proposal_type,
+                        proposal_id: p.proposal_id,
+                        title: p.meta_json?.body?.title || 'No Title',
+                        abstract: p.meta_json?.body?.abstract || '',
+                        motivation: p.meta_json?.body?.motivation || '',
+                        rationale: p.meta_json?.body?.rationale || '',
+                        drep_yes_pct: parseFloat(p.drep_yes_pct||0),
+                        drep_yes_votes_cast: parseInt(p.drep_yes_votes_cast||0),
+                        drep_no_votes_cast: parseInt(p.drep_no_votes_cast||0),
+                        drep_abstain_votes_cast: parseInt(p.drep_abstain_votes_cast||0)
+                    }));
+                    dataCache.proposals = true;
+                    applyProposalFilters();
+                } catch (err) {
+                    displayError(proposalsContainer, err.message);
                 } finally {
-                    lastUpdatedElement.textContent = new Date().toLocaleString();
                     setControlsDisabled(false);
+                    lastUpdatedElement.textContent = new Date().toLocaleString();
+                }
+            }
+
+            // --- DRep Directory Logic ---
+            function renderDReps(dreps) {
+                drepListContainer.innerHTML = '';
+                if (!dreps || dreps.length === 0) {
+                    drepListContainer.innerHTML = `<div class="text-center p-10 bg-gray-800 rounded-lg"><p class="text-lg">No DReps match the current filters.</p></div>`;
+                    return;
+                }
+                const list = document.createElement('div');
+                list.className = 'space-y-4';
+                dreps.forEach(drep => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-gray-800 rounded-lg p-4 flex items-center justify-between';
+                    const status = drep.status || 'unknown';
+                    const statusColor = status === 'active' ? 'bg-green-600' : (status === 'inactive' ? 'bg-yellow-600' : 'bg-red-600');
+                    const statusText = status.charAt(0).toUpperCase() + status.slice(1);
+
+                    card.innerHTML = `
+                        <div class="flex-1 min-w-0">
+                            <p class="font-mono text-sm text-cyan-400 break-all truncate" title="${drep.drep_id}">${drep.drep_id || 'Unknown ID'}</p>
+                        </div>
+                        <div class="flex items-center space-x-4 ml-4 flex-shrink-0">
+                            <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full ${statusColor} text-white">${statusText}</span>
+                            <button class="view-drep-votes-btn bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg" data-drep-id="${drep.drep_id}">View Votes</button>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                });
+                drepListContainer.appendChild(list);
+            }
+            
+            function applyDRepFilters() {
+                const filterText = drepSearchInput.value.toLowerCase();
+                const statusFilter = drepStatusFilter.value;
+                let filtered = allFetchedDReps;
+
+                if (statusFilter !== 'all') {
+                    filtered = filtered.filter(d => d.status === statusFilter);
+                }
+
+                if (filterText) {
+                    filtered = filtered.filter(d => d.drep_id.toLowerCase().includes(filterText));
+                }
+                
+                renderDReps(filtered);
+            }
+
+            async function fetchAndDisplayDReps() {
+                showLoading(drepListContainer);
+                setControlsDisabled(true);
+                try {
+                    const res = await fetch(proxyUrl(`${networkConfigs[currentNetwork].apiBase}/drep_list`));
+                    if (!res.ok) throw new Error(`API Error fetching DRep list: ${res.status}`);
+                    const allDReps = await res.json();
+                    if (!Array.isArray(allDReps)) {
+                        throw new Error("Unexpected API response format for DRep list.");
+                    }
+                    
+                    allFetchedDReps = allDReps;
+                    dataCache.dreps = true;
+                    applyDRepFilters();
+                } catch (err) {
+                    displayError(drepListContainer, err.message);
+                } finally {
+                    setControlsDisabled(false);
+                }
+            }
+            
+            // --- Modal Logic (Shared) ---
+            function renderModalVotes() {
+                const showRationale = rationaleFilterCheckbox.checked;
+                let votes, config, colors, isHistory;
+
+                if (currentModalVoterType === 'DRepHistory') {
+                    votes = showRationale ? voterVoteHistory.filter(v => v.meta_url) : voterVoteHistory;
+                    isHistory = true;
+                } else {
+                    votes = showRationale ? currentModalVotes.filter(v => v.meta_url) : currentModalVotes;
+                    isHistory = false;
+                }
+                
+                config = networkConfigs[currentNetwork];
+                colors = { Yes: 'text-green-400', No: 'text-red-400', Abstain: 'text-yellow-400' };
+
+                if (votes.length === 0) {
+                    modalContent.innerHTML = `<p class="text-gray-400 text-center">No votes found.</p>`;
+                    return;
+                }
+
+                let header = isHistory ? `<span>Proposal ID</span><span class="text-center">Rationale</span><span class="text-right">Vote</span>` : `<span>${currentModalVoterType} ID</span><span class="text-center">Rationale</span><span class="text-right">Vote</span>`;
+                let html = `<div class="grid grid-cols-3 gap-4 text-left font-bold text-gray-400 pb-2 border-b border-gray-600">${header}</div>`;
+                
+                html += votes.map(v => {
+                    const id = isHistory ? v.proposal_id : v.voter_id;
+                    const explorerLink = isHistory 
+                        ? `${config.govTools}/governance_actions/${id}` 
+                        : `${config.govTools}/drep_directory/${id}`;
+                    const rationaleButton = v.meta_url ? `<button class="view-rationale-btn text-cyan-400 hover:underline" data-meta-url="${v.meta_url}">📄 View</button>` : `<span class="text-gray-600">-</span>`;
+                    return `<div class="grid grid-cols-3 gap-4 items-center py-2 border-b border-gray-700 last:border-b-0"><a href="${explorerLink}" target="_blank" rel="noopener noreferrer" class="font-mono text-sm text-cyan-400 hover:underline break-all pr-4">${id}</a><div class="text-center">${rationaleButton}</div><span class="font-bold text-sm text-right ${colors[v.vote] || 'text-gray-400'}">${v.vote}</span></div>`;
+                }).join('');
+                modalContent.innerHTML = `<div>${html}</div>`;
+            }
+
+            async function fetchProposalVotes(proposalId, voterType) {
+                votesModal.classList.remove('hidden');
+                modalContent.innerHTML = `<div class="flex justify-center p-8"><svg class="animate-spin h-6 w-6 text-white"></svg></div>`;
+                currentModalVoterType = voterType;
+                modalTitle.textContent = `${voterType} Votes`;
+                rationaleFilterCheckbox.checked = false;
+                try {
+                    const res = await fetch(proxyUrl(`${networkConfigs[currentNetwork].apiBase}/proposal_votes?_proposal_id=${proposalId}`));
+                    if (!res.ok) throw new Error(`API Error: ${res.status}`);
+                    const allVotes = await res.json();
+                    currentModalVotes = allVotes.filter(v => v.voter_role === voterType);
+                    modalTitle.textContent = `${voterType} Votes (${currentModalVotes.length} total)`;
+                    renderModalVotes();
+                } catch (err) {
+                    modalContent.innerHTML = `<p class="text-red-400 text-center">${err.message}</p>`;
+                }
+            }
+
+            async function fetchDRepVotes(drepId) {
+                votesModal.classList.remove('hidden');
+                modalContent.innerHTML = `<div class="flex justify-center p-8"><svg class="animate-spin h-6 w-6 text-white"></svg></div>`;
+                currentModalVoterType = 'DRepHistory';
+                modalTitle.textContent = `Vote History for ${drepId.substring(0, 20)}...`;
+                rationaleFilterCheckbox.checked = false;
+                try {
+                    const res = await fetch(proxyUrl(`${networkConfigs[currentNetwork].apiBase}/drep_votes?_drep_id=${drepId}`));
+                    if (!res.ok) throw new Error(`API Error: ${res.status}`);
+                    voterVoteHistory = await res.json();
+                    modalTitle.textContent = `Vote History for ${drepId.substring(0, 20)}... (${voterVoteHistory.length} total)`;
+                    renderModalVotes();
+                } catch (err) {
+                    modalContent.innerHTML = `<p class="text-red-400 text-center">${err.message}</p>`;
+                }
+            }
+
+            async function fetchAndShowRationale(metaUrl) {
+                rationaleModal.classList.remove('hidden');
+                rationaleModalContent.innerHTML = `<div class="flex justify-center items-center p-8"><svg class="animate-spin h-6 w-6 text-white"></svg><p class="ml-4">Fetching rationale...</p></div>`;
+                
+                try {
+                    let url;
+                    if (metaUrl.startsWith('ipfs://')) {
+                        url = `https://ipfs.io/ipfs/${metaUrl.substring(7)}`;
+                    } else if (metaUrl.includes('/ipfs/')) {
+                        const cid = metaUrl.split('/ipfs/')[1];
+                        url = `https://ipfs.io/ipfs/${cid}`;
+                    } else {
+                        url = metaUrl;
+                    }
+
+                    const res = await fetch(proxyUrl(url));
+                    if (!res.ok) throw new Error(`Failed to fetch rationale. Status: ${res.status}`);
+                    const data = await res.json();
+                    
+                    const comment = data?.body?.comment;
+                    if (comment) {
+                        rationaleModalContent.innerHTML = markdownConverter.makeHtml(comment);
+                    } else {
+                        throw new Error("Rationale 'comment' field not found in metadata.");
+                    }
+                } catch (err) {
+                    rationaleModalContent.innerHTML = `<p class="text-red-400 text-center">${err.message}</p>`;
+                }
+            }
+
+            // --- AI Summary Logic ---
+            async function fetchAndSummarizeProposal(proposalId) {
+                aiSummaryModal.classList.remove('hidden');
+                aiModalContent.innerHTML = `<div class="flex justify-center items-center p-8"><svg class="animate-spin h-6 w-6 text-white"></svg><p class="ml-4">Generating summary with Gemini...</p></div>`;
+                const proposal = allFetchedProposals.find(p => p.proposal_id === proposalId);
+                if (!proposal) {
+                    aiModalContent.innerHTML = `<p class="text-red-400">Could not find proposal details.</p>`;
+                    return;
+                }
+                aiModalTitle.textContent = `✨ Summary for: ${proposal.title}`;
+                try {
+                    const proposalText = `Title: ${proposal.title}\n\nAbstract: ${proposal.abstract}\n\nMotivation: ${proposal.motivation}\n\nRationale: ${proposal.rationale}`;
+                    if (proposalText.trim().length < 50) {
+                        aiModalContent.innerHTML = `<p class="text-yellow-400">Not enough metadata to generate a summary.</p>`;
+                        return;
+                    }
+                    const prompt = `You are an expert AI assistant for Cardano DReps. Your task is to provide a concise, neutral summary of a governance proposal, focusing on the essential information a DRep needs for a quick assessment. Keep it brief. Structure your response in Markdown with these sections:
+- **Objective:** State the primary goal in one sentence.
+- **Proposed Change:** Clearly describe the specific action. For a parameter change, state old/new values. For a treasury withdrawal, state amount/recipient.
+- **Justification:** Briefly summarize the core reason for this change.
+Here is the proposal text:\n---\n${proposalText}\n---`;
+                    
+                    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                    const apiKey = ""; // Handled by environment
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error(`Gemini API Error: ${response.status}`);
+                    const result = await response.json();
+                    if (result.candidates && result.candidates.length > 0) {
+                        aiModalContent.innerHTML = markdownConverter.makeHtml(result.candidates[0].content.parts[0].text);
+                    } else {
+                        throw new Error("No summary generated. Response may be empty or blocked.");
+                    }
+                } catch (err) {
+                    aiModalContent.innerHTML = `<p class="text-red-400">Failed to generate summary: ${err.message}</p>`;
                 }
             }
 
             // --- Event Listeners ---
-            [searchInput, sortSelect, typeFilterSelect].forEach(el => el.addEventListener('change', applyFiltersAndSorting));
-            searchInput.addEventListener('input', applyFiltersAndSorting);
-            rationaleFilterCheckbox.addEventListener('change', renderModalVotes);
+            navProposals.addEventListener('click', () => showPage('proposals'));
+            navDRepDirectory.addEventListener('click', () => showPage('dreps'));
             
             networkSelect.addEventListener('change', (e) => {
                 currentNetwork = e.target.value;
                 networkNameSpan.textContent = networkConfigs[currentNetwork].name;
-                allFetchedProposals = [];
-                fetchAndDisplayProposals();
+                dataCache = { proposals: false, dreps: false }; // Invalidate cache
+                const currentPage = document.querySelector('.nav-button[aria-selected="true"]').id.replace('nav-', '').replace('-directory', '');
+                showPage(currentPage);
             });
 
+            // Proposal page listeners
+            [searchInput, sortSelect, typeFilterSelect].forEach(el => el.addEventListener('change', applyProposalFilters));
+            searchInput.addEventListener('input', applyProposalFilters);
             proposalsContainer.addEventListener('click', (e) => {
-                const button = e.target.closest('.view-votes-btn');
-                if (button) {
-                    const { proposalId, voterType } = button.dataset;
-                    fetchAndShowVotes(proposalId, voterType);
+                const viewBtn = e.target.closest('.view-votes-btn');
+                const summaryBtn = e.target.closest('.summarize-btn');
+                if (viewBtn) fetchProposalVotes(viewBtn.dataset.proposalId, viewBtn.dataset.voterType);
+                if (summaryBtn) fetchAndSummarizeProposal(summaryBtn.dataset.proposalId);
+            });
+
+            // DRep page listeners
+            drepSearchInput.addEventListener('input', applyDRepFilters);
+            drepStatusFilter.addEventListener('change', applyDRepFilters);
+            drepListContainer.addEventListener('click', (e) => {
+                const viewBtn = e.target.closest('.view-drep-votes-btn');
+                if (viewBtn) fetchDRepVotes(viewBtn.dataset.drepId);
+            });
+            
+            // Modal listeners
+            rationaleFilterCheckbox.addEventListener('change', renderModalVotes);
+            modalContent.addEventListener('click', (e) => {
+                const rationaleBtn = e.target.closest('.view-rationale-btn');
+                if (rationaleBtn) {
+                    fetchAndShowRationale(rationaleBtn.dataset.metaUrl);
                 }
             });
-
-            modalCloseBtn.addEventListener('click', () => modal.classList.add('hidden'));
-            modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+            modalCloseBtn.addEventListener('click', () => votesModal.classList.add('hidden'));
+            votesModal.addEventListener('click', (e) => { if (e.target === votesModal) votesModal.classList.add('hidden'); });
+            aiModalCloseBtn.addEventListener('click', () => aiSummaryModal.classList.add('hidden'));
+            aiModalCloseBtn.addEventListener('click', (e) => { if (e.target === aiSummaryModal) aiSummaryModal.classList.add('hidden'); });
+            rationaleModalCloseBtn.addEventListener('click', () => rationaleModal.classList.add('hidden'));
+            rationaleModal.addEventListener('click', (e) => { if (e.target === rationaleModal) rationaleModal.classList.add('hidden'); });
 
             // --- Initial Load ---
-            fetchAndDisplayProposals();
+            showPage('proposals');
         });
     </script>
-
 </body>
 </html>
