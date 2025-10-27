@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Active Cardano Governance Proposals (Multi-Network)</title>
+    <title>Cardano Governance Actions (Multi-Network)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/showdown/2.1.0/showdown.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -110,6 +110,17 @@
                     <option value="preprod">Network: Preprod</option>
                     <option value="preview">Network: Preview</option>
                 </select>
+                
+                <!-- NEW: Status Filter -->
+                <select id="status-filter" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                    <option value="active">Status: Active Only</option>
+                    <option value="all">Status: All Actions</option>
+                    <option value="ratified">Status: Ratified</option>
+                    <option value="enacted">Status: Enacted</option>
+                    <option value="dropped">Status: Dropped</option>
+                    <option value="expired">Status: Expired</option>
+                </select>
+
                 <select id="type-filter" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
                     <option value="all">Filter by Type: All</option>
                     <option value="ParameterChange">Parameter Change</option>
@@ -120,11 +131,15 @@
                     <option value="UpdateToConstitution">Update Constitution</option>
                     <option value="InfoAction">Info Action</option>
                 </select>
-                <input type="text" id="search-filter" placeholder="Filter by title..." class="sm:col-span-2 lg:col-span-1 flex-grow bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                
                 <select id="sort-select" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
                     <option value="drep-yes-pct-desc">Sort by: Highest DRep Yes %</option>
                     <option value="drep-yes-pct-asc">Sort by: Lowest DRep Yes %</option>
                 </select>
+                
+                <!-- Search filter spans all columns for better usability -->
+                <input type="text" id="search-filter" placeholder="Filter by title..." class="col-span-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+
             </div>
             <main id="proposals-container"><!-- Proposals will be injected here --></main>
         </div>
@@ -133,7 +148,7 @@
         <div id="drep-directory-page" class="hidden">
             <div class="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
                  <input type="text" id="drep-search-filter" placeholder="Search by DRep ID..." class="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
-                 <select id="drep-status-filter" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                 <select type="text" id="drep-status-filter" class="bg-gray-800 border border-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none">
                     <option value="all">Filter by Status: All</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -207,6 +222,7 @@
             const searchInput = document.getElementById('search-filter');
             const sortSelect = document.getElementById('sort-select');
             const typeFilterSelect = document.getElementById('type-filter');
+            const statusFilterSelect = document.getElementById('status-filter'); // NEW
 
             // DRep page controls
             const drepSearchInput = document.getElementById('drep-search-filter');
@@ -267,7 +283,16 @@
             const displayError = (container, message) => {
                 container.innerHTML = `<div class="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg"><strong class="font-bold">Error:</strong> <span>${message}</span></div>`;
             };
-            const setControlsDisabled = (disabled) => [networkSelect, searchInput, sortSelect, typeFilterSelect, drepSearchInput, drepStatusFilter].forEach(el => el.disabled = disabled);
+            const setControlsDisabled = (disabled) => [networkSelect, searchInput, sortSelect, typeFilterSelect, statusFilterSelect, drepSearchInput, drepStatusFilter].forEach(el => el.disabled = disabled);
+
+            // Function to determine proposal status (NEW)
+            function getProposalStatus(p) {
+                if (p.enacted_epoch !== null) return { text: 'Enacted', classes: 'bg-green-600 text-white border-green-400', key: 'enacted' };
+                if (p.ratified_epoch !== null) return { text: 'Ratified', classes: 'bg-indigo-600 text-white border-indigo-400', key: 'ratified' };
+                if (p.dropped_epoch !== null) return { text: 'Dropped', classes: 'bg-red-600 text-white border-red-400', key: 'dropped' };
+                if (p.expired_epoch !== null) return { text: 'Expired', classes: 'bg-gray-600 text-white border-gray-400', key: 'expired' };
+                return { text: 'Active', classes: 'bg-cyan-600 text-white border-cyan-400', key: 'active' };
+            }
 
             // --- Page Navigation ---
             function showPage(page) {
@@ -295,14 +320,21 @@
                 proposals.forEach(p => {
                     const card = document.createElement('div');
                     card.className = 'bg-gray-800 rounded-xl shadow-lg p-6 flex flex-col transition-all duration-300 hover:shadow-cyan-500/20 hover:ring-1 hover:ring-cyan-800';
-                    const style = typeStyles[p.type] || { ...typeStyles['Default'], text: pascalToTitleCase(p.type) };
+                    const typeStyle = typeStyles[p.type] || { ...typeStyles['Default'], text: pascalToTitleCase(p.type) };
+                    const proposalStatus = getProposalStatus(p); // GET STATUS
                     const thresholds = getThresholds(p.type);
+                    const isActive = proposalStatus.key === 'active'; // Check if proposal is active
 
                     card.innerHTML = `
                         <div class="flex-grow">
-                            <div class="mb-4"><span class="text-xs font-bold px-3 py-1 rounded-full border ${style.classes}">${style.text.toUpperCase()}</span></div>
+                            <div class="flex items-center space-x-2 mb-4">
+                                <span class="text-xs font-bold px-3 py-1 rounded-full border ${typeStyle.classes}">${typeStyle.text.toUpperCase()}</span>
+                                <span class="text-xs font-bold px-3 py-1 rounded-full border ${proposalStatus.classes}">${proposalStatus.text.toUpperCase()}</span>
+                            </div>
                             <h2 class="text-lg font-bold text-white mb-1">${p.title}</h2>
                             <a href="${networkConfigs[currentNetwork].govTools}/governance_actions/${p.proposal_id}" target="_blank" rel="noopener noreferrer" class="block text-xs text-cyan-400 hover:underline mb-4 break-all font-mono">ID: ${p.proposal_id}</a>
+                            
+                            ${isActive ? `
                             <div>
                                 <div class="flex justify-between items-end mb-1"><span class="text-sm font-medium text-green-400">DRep "Yes"</span><span class="text-xl font-bold text-green-300">${p.drep_yes_pct.toFixed(2)}%</span></div>
                                 <div class="relative w-full bg-gray-700 rounded-full h-3"><div class="bg-gradient-to-r from-green-500 to-emerald-400 h-3 rounded-full" style="width: ${p.drep_yes_pct}%"></div>${thresholds.drep ? `<div class="threshold-line bg-yellow-300" style="left: ${thresholds.drep*100}%" title="Threshold"></div>` : ''}</div>
@@ -312,10 +344,11 @@
                                 <div><p class="text-gray-400">No</p><p class="font-semibold">${p.drep_no_votes_cast.toLocaleString()}</p></div>
                                 <div><p class="text-gray-400">Abstain</p><p class="font-semibold">${p.drep_abstain_votes_cast.toLocaleString()}</p></div>
                             </div>
+                            ` : `<p class="text-gray-400 italic mt-4">Voting has closed. This action is **${proposalStatus.text.toLowerCase()}**.</p>`}
                         </div>
                         <div class="mt-6 pt-4 border-t border-gray-700/50 flex flex-col gap-3">
                             <button class="summarize-btn w-full gemini-button text-white font-bold py-2 px-4 rounded-lg" data-proposal-id="${p.proposal_id}">✨ Summarize with AI</button>
-                            <button class="view-votes-btn w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg" data-proposal-id="${p.proposal_id}" data-voter-type="DRep">View DRep Votes</button>
+                            <button class="view-votes-btn w-full ${isActive ? 'bg-cyan-700 hover:bg-cyan-600' : 'bg-gray-600 hover:bg-gray-500'} text-white font-bold py-2 px-4 rounded-lg" data-proposal-id="${p.proposal_id}" data-voter-type="DRep">View ${isActive ? 'DRep' : 'Final'} Votes</button>
                         </div>`;
                     grid.appendChild(card);
                 });
@@ -325,10 +358,20 @@
             function applyProposalFilters() {
                 const filterText = searchInput.value.toLowerCase();
                 const typeFilter = typeFilterSelect.value;
+                const statusFilter = statusFilterSelect.value; // NEW
                 const sortValue = sortSelect.value;
                 let filtered = allFetchedProposals
                     .filter(p => p.title.toLowerCase().includes(filterText))
                     .filter(p => typeFilter === 'all' || p.type === typeFilter);
+                
+                // NEW: Status filtering logic
+                filtered = filtered.filter(p => {
+                    if (statusFilter === 'all') return true;
+                    const statusKey = getProposalStatus(p).key;
+                    return statusKey === statusFilter;
+                });
+                // END NEW STATUS FILTERING
+
                 filtered.sort((a, b) => {
                     if (sortValue === 'drep-yes-pct-asc') return a.drep_yes_pct - b.drep_yes_pct;
                     return b.drep_yes_pct - a.drep_yes_pct;
@@ -343,9 +386,11 @@
                     const res = await fetch(proxyUrl(`${networkConfigs[currentNetwork].apiBase}/proposal_list`));
                     if (!res.ok) throw new Error(`API Error: ${res.status}`);
                     const proposals = await res.json();
-                    const active = proposals.filter(p => p.ratified_epoch === null && p.enacted_epoch === null && p.dropped_epoch === null && p.expired_epoch === null && p.proposal_type !== 'CommitteeNoConfidence');
                     
-                    const summaries = await Promise.all(active.map(p => 
+                    // REMOVED FILTER FOR ACTIVE ONLY
+                    const allActions = proposals.filter(p => p.proposal_type !== 'CommitteeNoConfidence'); 
+                    
+                    const summaries = await Promise.all(allActions.map(p => 
                         fetch(proxyUrl(`${networkConfigs[currentNetwork].apiBase}/proposal_voting_summary?_proposal_id=${p.proposal_id}`))
                         .then(res => res.ok ? res.json() : null)
                         .then(summary => summary && summary[0] ? ({...p, ...summary[0]}) : null)
@@ -538,7 +583,7 @@
                         throw new Error("Rationale 'comment' field not found in metadata.");
                     }
                 } catch (err) {
-                    rationaleModalContent.innerHTML = `<p class="text-red-400 text-center">${err.message}</p>`;
+                    rationaleModalContent.innerHTML = `<p class="text-red-400">Failed to fetch rationale: ${err.message}</p>`;
                 }
             }
 
@@ -548,10 +593,6 @@
                 aiModalContent.innerHTML = `<div class="flex justify-center items-center p-8"><svg class="animate-spin h-6 w-6 text-white"></svg><p class="ml-4">Generating summary...</p></div>`;
                 
                 try {
-                    if (!GOOGLE_APPS_SCRIPT_URL || GOOGLE_APPS_SCRIPT_URL === 'YOUR_WEB_APP_URL_HERE') {
-                        throw new Error("Google Apps Script URL is not configured. Please update the code.");
-                    }
-
                     const proposal = allFetchedProposals.find(p => p.proposal_id === proposalId);
                     if (!proposal) {
                         throw new Error("Could not find proposal details.");
@@ -563,12 +604,13 @@
                         aiModalContent.innerHTML = `<p class="text-yellow-400">Not enough metadata to generate a summary.</p>`;
                         return;
                     }
-
+                    
+                    // --- Gemini API Call Simulation/Proxy ---
                     const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
                         method: 'POST',
                         body: JSON.stringify({ text: proposalText }),
                         headers: {
-                            'Content-Type': 'text/plain;charset=utf-8', // Required for Apps Script
+                            'Content-Type': 'text/plain;charset=utf-8', 
                         },
                     });
                     
@@ -604,7 +646,7 @@
             });
 
             // Proposal page listeners
-            [searchInput, sortSelect, typeFilterSelect].forEach(el => el.addEventListener('change', applyProposalFilters));
+            [searchInput, sortSelect, typeFilterSelect, statusFilterSelect].forEach(el => el.addEventListener('change', applyProposalFilters));
             searchInput.addEventListener('input', applyProposalFilters);
             proposalsContainer.addEventListener('click', (e) => {
                 const viewBtn = e.target.closest('.view-votes-btn');
@@ -632,7 +674,7 @@
             modalCloseBtn.addEventListener('click', () => votesModal.classList.add('hidden'));
             votesModal.addEventListener('click', (e) => { if (e.target === votesModal) votesModal.classList.add('hidden'); });
             aiModalCloseBtn.addEventListener('click', () => aiSummaryModal.classList.add('hidden'));
-            aiModalCloseBtn.addEventListener('click', (e) => { if (e.target === aiSummaryModal) aiSummaryModal.classList.add('hidden'); });
+            aiSummaryModal.addEventListener('click', (e) => { if (e.target === aiSummaryModal) aiSummaryModal.classList.add('hidden'); });
             rationaleModalCloseBtn.addEventListener('click', () => rationaleModal.classList.add('hidden'));
             rationaleModal.addEventListener('click', (e) => { if (e.target === rationaleModal) rationaleModal.classList.add('hidden'); });
 
